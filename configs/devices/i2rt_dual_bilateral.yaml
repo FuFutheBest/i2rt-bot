@@ -1,0 +1,157 @@
+devices:
+- class: "OpenCVCameraDevice"
+  device_class_id: 0   # camera egocentric
+  capture_id: ${camera.ego_capture_id}
+  state_feedback:
+    fps: 30.0
+    buffer_size: 200
+    hardware_latency_ms: 33.0
+    format:
+      shape: [360, 640, 3]
+      dtype: "uint8"
+      type: rgb
+  realsense_serial: ${camera.ego_serial}
+- class: "OpenCVCameraDevice"
+  device_class_id: 1   # camera left
+  capture_id: ${camera.left_capture_id}
+  state_feedback:
+    fps: 30.0
+    buffer_size: 200
+    hardware_latency_ms: 33.0
+    format:
+      shape: [240, 320, 3]
+      dtype: "uint8"
+      type: rgb
+  realsense_serial: ${camera.left_serial}
+- class: "OpenCVCameraDevice"
+  device_class_id: 2   # camera right
+  capture_id: ${camera.right_capture_id}
+  state_feedback:
+    fps: 30.0
+    buffer_size: 200
+    hardware_latency_ms: 33.0
+    format:
+      shape: [240, 320, 3]
+      dtype: "uint8"
+      type: rgb
+  realsense_serial: ${camera.right_serial}
+- class: "I2RTRobot"
+  device_class_id: 3
+  mode: "follower"
+  gripper_type: "linear_4310"
+  bilateral_kp: 0.25
+  bilateral_kd: 0.5
+  state_feedback:
+    fps: 100.0
+    buffer_size: 5000
+    hardware_latency_ms: 0.0
+    format:
+      shape: [14]
+      dtype: "float64"
+      type: [j1-7, j1-7]    # Left arm then right arm joint positions.
+  control:
+    type: joints    # joints | eef_abs | eef_rel
+    source_selection:
+      mode: dual_source
+      sources:
+        policy:
+          device: self
+          port: command
+        teleoperation:
+          device: I2RTRobot
+          device_class_id: 4
+          port: state
+      dual_source_selector:
+        endpoint:
+          device: I2RTRobot
+          device_class_id: 4
+          port: control_flag
+    execution:
+      mode: synchronous    # synchronous | legacy_async
+      fps: 100.0
+    buffer_size: 5000
+    format:
+      shape: [14]
+      dtype: "float64"
+      type: [j1-7, j1-7]    # Left arm then right arm joint targets.
+  left_server_host: "127.0.0.1"
+  right_server_host: "127.0.0.1"
+  left_server_port: 1234
+  right_server_port: 1235
+  left_can_channel: "can_follower_l"
+  right_can_channel: "can_follower_r"
+  server_startup_wait_s: 3.0
+  home_joint_pos: ${robot.follower_home_joint_pos}
+  signal_files: ${runtime.signal_files}
+  disconnection_recovery: ${robot.disconnection_recovery}
+  random_init_pose: ${oc.select:robot.random_init_pose,false}
+  random_init_pose_params: ${oc.select:robot.random_init_pose_params,null}
+  random_init_pose_sync: ${oc.select:robot.random_init_pose_sync,false}
+  # The follower consumes the leader's .5 phase even though only the leader
+  # is allowed to initiate it. Keep hold-feedback limits identical on both.
+  takeover_alignment:
+    enabled: false
+    hold_feedback_tolerance_rad: ${oc.select:robot.takeover_alignment.hold_feedback_tolerance_rad,0.05}
+    hold_feedback_min_settle_s: ${oc.select:robot.takeover_alignment.hold_feedback_min_settle_s,0.05}
+    hold_feedback_stable_samples: ${oc.select:robot.takeover_alignment.hold_feedback_stable_samples,2}
+
+  # Bimanual leader robot (read-only operator side)
+  # Publishes:
+  #   - state SHM: I2RTRobot_0_data (14)
+  #   - control flag SHM: I2RTRobot_0_control_flag (1)
+- class: "I2RTRobot"
+  device_class_id: 4
+  mode: "leader"
+  gripper_type: "yam_teaching_handle"
+  bilateral_kp: 0.25
+  bilateral_kd: 0.5
+  state_feedback:
+    fps: 100.0
+    buffer_size: 5000
+    hardware_latency_ms: 0.0
+    format:
+      shape: [14]
+      dtype: "float64"
+      type: [j1-7, j1-7]    # Left arm then right arm joint positions.
+  control:
+    type: joints    # joints | eef_abs | eef_rel
+    source_selection:
+      mode: dual_source
+      sources:
+        policy:
+          device: I2RTRobot
+          device_class_id: 3
+          port: state
+        teleoperation:
+          device: self
+          port: state
+      dual_source_selector:
+        endpoint:
+          device: self
+          port: control_flag
+    execution:
+      mode: synchronous    # synchronous | legacy_async
+      fps: 100.0
+    buffer_size: 5000
+    format:
+      shape: [14]
+      dtype: "float64"
+      type: [j1-7, j1-7]    # Left arm then right arm joint targets.
+  left_server_host: "127.0.0.1"
+  right_server_host: "127.0.0.1"
+  left_server_port: 1236
+  right_server_port: 1237
+  left_can_channel: "can_leader_l"
+  right_can_channel: "can_leader_r"
+  server_startup_wait_s: 3.0
+  home_joint_pos: ${robot.leader_home_joint_pos}
+  signal_files: ${runtime.signal_files}
+  disconnection_recovery: ${robot.disconnection_recovery}
+  # Optional three-phase policy-to-human handover.  Keep it absent by default
+  # so existing binary 0/1 dual-control workflows retain their behavior.
+  takeover_alignment: ${oc.select:robot.takeover_alignment,null}
+  # The leader never samples an independent home target; it only follows the
+  # follower target when randomized home is enabled for the pair.
+  random_init_pose: false
+  random_init_pose_params: ${oc.select:robot.random_init_pose_params,null}
+  random_init_pose_sync: ${oc.select:robot.random_init_pose_sync,false}

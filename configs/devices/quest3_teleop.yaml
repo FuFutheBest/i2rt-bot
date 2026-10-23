@@ -1,0 +1,164 @@
+# Devices for Rizon dual-arm EEF absolute mode (Quest3 setup)
+
+devices:
+  # - class: "HikCameraDevice"
+  #   device_class_id: 0 # Renumber the full list if enabling these examples.
+  #   capture_id: ${camera.left_capture_id}
+  #   data_shape: [360, 270, 3]
+  #   fps: 25.0
+  #   data_dtype: "uint8"
+  #   buffer_size: 200
+  #   hardware_latency_ms: 80.0
+  #   # Hikvision camera hardware parameters
+  #   pixel_format: "RGB8"  # Pixel format (must be set first)
+  #   frame_rate_enable: true  # Enable frame rate control
+  #   exposure_time: 5000.0  # Exposure time in microseconds
+  #   gain: 16.9807  # Gain in dB
+  #   gamma_enable: true  # Enable gamma correction
+  #   gamma: 0.68  # Gamma value
+  #   rotation_angle: 90  # Rotate frame clockwise (supports 0/90/180/270)
+
+
+  # - class: "HikCameraDevice"
+  #   device_class_id: 1
+  #   capture_id: ${camera.right_capture_id}
+  #   data_shape: [360, 270, 3]
+  #   fps: 25.0
+  #   data_dtype: "uint8"
+  #   buffer_size: 200
+  #   hardware_latency_ms: 80.0
+  #   # Hikvision camera hardware parameters
+  #   pixel_format: "RGB8"  # Pixel format (must be set first)
+  #   frame_rate_enable: true  # Enable frame rate control
+  #   exposure_time: 5000.0  # Exposure time in microseconds
+  #   gain: 16.9807  # Gain in dB
+  #   gamma_enable: true  # Enable gamma correction
+  #   gamma: 0.68  # Gamma value
+  #   rotation_angle: 90  # Rotate frame clockwise (supports 0/90/180/270)
+
+  - class: "Quest3Teleoperator"
+    device_class_id: 0
+    state_feedback:
+      fps: 100.0
+      buffer_size: 100
+      hardware_latency_ms: 5.0
+      format:
+        shape: [16]
+        dtype: "float64"
+        # Left/right absolute TCP pose (XYZW) followed by each gripper command.
+        type: [xyz, qxqyqzqw, gripper, xyz, qxqyqzqw, gripper]
+    host_ip: "10.128.1.152"
+    port: 8082
+    teleop_source: "vr"
+    teleop_mode: "dual_arm_6DOF"
+    max_gripper_width: 0.144
+    min_gripper_width: 0.0
+    grasp_force: 100.0
+    calibration_path: "./data/calibration/ywy"
+    robot_device_name: "RizonRobot"
+    robot_device_class_id: 1
+
+  - class: "RizonRobot"
+    device_class_id: 1
+    robot_sn: ["Rizon4-062723","Rizon4-062743"]
+    state_feedback:
+      fps: 120.0
+      buffer_size: 1000
+      hardware_latency_ms: 10.0
+      format:
+        shape: [44]
+        dtype: "float64"
+        # Left arm then right arm; TCP feedback quaternions use WXYZ order.
+        type: [j1-7, dq1-7, xyz, qwqxqyqz, gripper, j1-7, dq1-7, xyz, qwqxqyqz, gripper]
+    control:
+      type: eef_abs  # joints | eef_abs | eef_rel
+      source_selection:
+        mode: single_source
+        source:
+          device: Quest3Teleoperator
+          device_class_id: 0
+          port: state
+      execution:
+        mode: synchronous  # synchronous | legacy_async
+        fps: 100.0
+      buffer_size: 100
+      format:
+        shape: [16]
+        dtype: "float64"
+        # Per arm: absolute TCP xyz, quaternion (XYZW), then gripper command.
+        type: [xyz, qxqyqzqw, gripper, xyz, qxqyqzqw, gripper]
+      cartesian_impedance:
+        translation_n_m: [10000.0, 10000.0, 10000.0]
+        rotation_nm_rad: [1500.0, 1500.0, 1500.0]
+    motion_limits:
+      velocity:
+        joints_rad_s:
+          left: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+          right: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+        tcp_linear_m_s: 1.0
+        tcp_angular_rad_s: 2.0
+      acceleration:
+        joints_rad_s2:
+          left: [2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0]
+          right: [2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0]
+        tcp_linear_m_s2: 2.0
+        tcp_angular_rad_s2: 5.0
+      # null disables the limit; otherwise [Fx, Fy, Fz, Mx, My, Mz] in N / N*m.
+      max_tcp_contact_wrench: null
+    gripper:
+      backend: "flexiv"
+      name: "GripperDahuanModbus"
+      tool_name: "iphone"
+    signal_files: ${runtime.signal_files}
+    home:
+      preset_index: ${robot.home}
+      presets:
+        - name: "rizon_dual_default"
+          description: "Dual-arm calibrated home pose default"
+          joints_left: [0.6782, 0.8476237, 0.3398, 0.94525, 2.1322, 0.755, 1.76]
+          #joints_left: [0.9, 0.977, 0.1, 1.0962, 1.99, 0.619, 1.873]
+          joints_right: [0.626, 1.17638, -0.35, 1.7668, -2.45, 0.6699, 0.5214625]
+
+
+        - name: "rizon_dual_default"
+          description: "Dual-arm calibrated home pose default"
+          joints_left: [2.019, 1.316, 0.446, 2.295, 0.418, 2.697, 0.858]  # Right arm home joint angles [rad]
+          joints_right: [2.019, 1.316, 0.446, 2.295, 0.418, 2.697, 0.858]
+
+        - name: "rizon_dual_1"
+          description: "Legacy home pose 1"
+          joints_left: [1.088046908378601, 1.2829036712646484, 0.2113117128610611, 1.467348575592041, 1.6145037412643433, 1.2537493705749512, 0.2700965404510498]
+          joints_right: [1.088046908378601, 1.2829036712646484, 0.2113117128610611, 1.467348575592041, 1.6145037412643433, 1.2537493705749512, 0.2700965404510498]
+        - name: "rizon_dual_2"
+          description: "Legacy home pose 2"
+          joints_left: [2.019, 1.316, 0.446, 2.295, 0.418, 2.697, 0.858]  # Right arm home joint angles [rad]
+          joints_right: [2.019, 1.316, 0.446, 2.295, 0.418, 2.697, 0.858]
+        - name: "rizon_dual_3"
+          description: "Legacy home pose 3"
+          joints_left: [1.088046908378601, 1.2829036712646484, 0.2113117128610611, 1.467348575592041, 1.6145037412643433, 1.2537493705749512, 0.2700965404510498]
+          joints_right: [1.088046908378601, 1.2829036712646484, 0.2113117128610611, 1.467348575592041, 1.6145037412643433, 1.2537493705749512, 0.2700965404510498]
+
+        - name: "rizon_dual_4"
+          description: "Legacy home pose 4"
+          joints_left: [2.129301687, 1.291543646, 0.42062435, 2.127730891, 0.120951317, 2.11394279, 0.940208868]
+          joints_right: [2.129301687, 1.291543646, 0.42062435, 2.127730891, 0.120951317, 2.11394279, 0.940208868]
+
+        - name: "rizon_dual_5"
+          description: "Legacy home pose 5"
+          joints_left: [2.019, 1.316, 0.446, 2.295, 0.418, 2.697, 0.858]  # Right arm home joint angles [rad]
+          joints_right: [2.019, 1.316, 0.446, 2.295, 0.418, 2.697, 0.858]
+
+        - name: "rizon_dual_6"
+          description: "Legacy home pose 6"
+          joints_left: [1.755649, 0.895529, 0.603186, 1.975220, 0.384683, 2.160714, 0.858187]  # Right arm home joint angles [rad]
+          joints_right: [1.755649, 0.895529, 0.603186, 1.975220, 0.384683, 2.160714, 0.858187]
+
+        - name: "rizon_dual_7"
+          description: "Legacy home pose 7"
+          joints_left: [ 2.005, 0.806, 0.571, 2.289, 0.420, 2.963, 0.794 ]  # Right arm home joint angles [rad]
+          joints_right: [ 2.005, 0.806, 0.571, 2.289, 0.420, 2.963, 0.794 ]
+
+        - name: "rizon_dual_8"
+          description: "Legacy home pose 8"
+          joints_left: [2.005, 0.806, 0.571, 2.289, 0.420, 2.963, 0.794 ]  # Right arm home joint angles [rad]
+          joints_right: [ 1.99, 0.65, 0.59, 2.03, 0.12, 2.30, 0.84 ]

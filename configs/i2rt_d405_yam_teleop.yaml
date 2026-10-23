@@ -1,0 +1,46 @@
+version: 1
+episode_signal_pattern: /tmp/superinference_episode_{signal}
+
+control:
+  frequency_hz: 100.0
+  alignment_duration_s: 3.0
+  alignment_max_velocity_rad_s: 0.7
+  alignment_settle_timeout_s: 3.0
+  alignment_tolerance: 0.18
+  alignment_stable_samples: 3
+  startup_timeout_s: 10.0
+  rpc_timeout_s: 2.0
+  cycle_rpc_timeout_s: 0.10
+  command_frame_max_age_s: 0.05
+  command_lease_timeout_s: 0.15
+  feedback_timeout_s: 0.10
+  watchdog_check_interval_s: 0.005
+  following_error_fault_threshold: 1.0
+  following_error_fault_samples: 3
+  enter_chord_window_s: 0.30
+  button_debounce_samples: 3
+  bilateral_kp: 0.0
+  bilateral_kd: 0.0
+  leader_feedback: true
+
+arms:
+  left:
+    leader:
+      can_channel: can1
+      rpc_port: 1236
+    follower:
+      can_channel: can3
+      rpc_port: 1234
+      gripper: &yam_gripper
+        backend: i2rt_can
+        type: crank_4310
+
+  right:
+    leader:
+      can_channel: can0
+      rpc_port: 1237
+    follower:
+      can_channel: can2
+      rpc_port: 1235
+      joint_directions: [1, 1, 1, 1, 1, 1, 1]
+      gripper: *yam_gripper

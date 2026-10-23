@@ -1,0 +1,26 @@
+# @package _global_
+
+defaults:
+  - /policy_infer/robotwin/config_infer_robotwin_replay_joint14
+  - _self_
+
+# This is an explicit adapter template.  A run must provide a pure-Numpy
+# eef16-to-joint14 function and a [T,16] action file; the joint14 bridge itself
+# remains the only SAPIEN scene owner and does not run IK in its physics loop.
+robotwin:
+  action_schema: eef16
+  control:
+    type: eef_abs  # joints | eef_abs | eef_rel
+    format:
+      shape: [16]
+      dtype: float64
+      # Per arm: TCP xyz, quaternion (XYZW), then gripper command.
+      type: [xyz, qxqyqzqw, gripper, xyz, qxqyqzqw, gripper]
+  # This preset is an explicit adapter template.  Override it with a pure
+  # NumPy ``module:callable`` resolver before launching.
+  eef_resolver: ${oc.env:ROBOTWIN_EEF_RESOLVER,not_configured}
+
+policy:
+  params:
+    action_schema: eef16
+    actions_path: ${oc.env:ROBOTWIN_EEF_REPLAY_ACTIONS,not_configured.npz}

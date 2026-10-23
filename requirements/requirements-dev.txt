@@ -1,0 +1,19 @@
+# Development and test dependencies for SuperInference.
+-r requirements.txt
+
+pytest
+pytest-mock
+pre-commit
+ruff
+
+# Root contract tests import policy-history image/video helpers and transform
+# utilities.  These are lightweight runtime dependencies, not vendor/model
+# packages, and keep a clean CI environment equivalent to the developer setup.
+imageio
+transforms3d
+matplotlib
+msgpack
+websockets>=13
+
+# Device-preflight tests verify comment-preserving config updates.
+ruamel.yaml

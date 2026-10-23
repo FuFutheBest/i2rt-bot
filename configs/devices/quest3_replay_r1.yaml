@@ -1,0 +1,182 @@
+# Replay an R1 NEDF3 episode back onto the REAL robot (no teleop hardware).
+#
+# Launch:  python device_starter.py --config-name quest3_replay_r1
+#
+# How it works (see ReplayTeleoperator + YamHeadRobot.head_pose_replay):
+#   - ReplayTeleoperator reads a recorded episode mcap and publishes:
+#       ReplayTeleoperator_0_data      (16-wide: dual-arm TCP + grippers)
+#       ReplayTeleoperator_0_head_cmd  (7-wide head EE pose7, replay only)
+#   - RizonRobotLKForceGated consumes the 16-wide stream exactly as in teleop
+#     (eef_abs servo + LKTech grippers + force gating).
+#   - YamHeadRobot (head_pose_replay: true) IKs the recorded head tcp/cmd pose
+#     onto the head arm through the same slew-limited publisher.
+#
+# SAFETY: the robot moves on its own. Clear the workspace, keep an e-stop ready.
+# No cameras/ZED/teleop here on purpose (avoid double-writing the control SHM
+# and keep the rig light). Set the episode/speed/loop on the ReplayTeleoperator
+# block below, or override on the CLI, e.g.:
+#   python device_starter.py --config-name quest3_replay_r1 devices.devices.0.episode=saved_data/episode_0003\
+#        devices.devices.0.speed=0.5
+
+devices:
+  # ---- replay producer ----
+  - class: "ReplayTeleoperator"
+    device_class_id: 0
+    state_feedback:
+      fps: 100.0
+      buffer_size: 100
+      hardware_latency_ms: 5.0
+      format:
+        shape: [16]
+        dtype: "float64"
+        # Left/right recorded TCP command (XYZW) followed by each gripper command.
+        type: [xyz, qxqyqzqw, gripper, xyz, qxqyqzqw, gripper]
+    episode: "saved_data/episode_0000"
+    speed: 1.0
+    loop: false
+    warmup_s: 2.0
+    # Derived from the shared LKTech gripper preset unless explicitly overridden.
+    gripper_min_width: 0.0
+    enable_head: true
+
+  # ---- dual Flexiv arms + LKTech grippers (same as collect/teleop) ----
+  - class: "RizonRobotLKForceGated"
+    device_class_id: 1
+    robot_sn:
+      - "${oc.env:R1_LEFT_ROBOT_SN,Rizon4-063087}"
+      - "${oc.env:R1_RIGHT_ROBOT_SN,Rizon4R-062071}"
+    state_feedback:
+      fps: 120.0
+      buffer_size: 1000
+      hardware_latency_ms: 10.0
+      format:
+        shape: [74]
+        dtype: "float64"
+        # Base state: left arm then right arm. Each arm is q, dq, measured TCP
+        # pose (WXYZ), and gripper width. The remaining entries are documented
+        # in order as measured gripper details and commanded TCP/wrench pairs.
+        type: [j1-7, dq1-7, xyz, qwqxqyqz, gripper, j1-7, dq1-7, xyz, qwqxqyqz, gripper, gripper, motor_angle, gripper, motor_angle, xyz, qwqxqyqz, wrench, xyz, qwqxqyqz, wrench]
+    control:
+      type: eef_abs  # joints | eef_abs | eef_rel
+      source_selection:
+        mode: single_source
+        source:
+          device: ReplayTeleoperator
+          device_class_id: 0
+          port: state
+      execution:
+        mode: synchronous  # synchronous | legacy_async
+        fps: 100.0
+      buffer_size: 100
+      format:
+        shape: [16]
+        dtype: "float64"
+        # Per arm: absolute TCP xyz, quaternion (XYZW), then gripper command.
+        type: [xyz, qxqyqzqw, gripper, xyz, qxqyqzqw, gripper]
+      cartesian_impedance:
+        translation_n_m: [10000.0, 10000.0, 10000.0]
+        rotation_nm_rad: [1500.0, 1500.0, 1500.0]
+    motion_limits:
+      velocity:
+        joints_rad_s:
+          left: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+          right: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+        tcp_linear_m_s: 1.0
+        tcp_angular_rad_s: 2.0
+      acceleration:
+        joints_rad_s2:
+          left: [2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0]
+          right: [2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0]
+        tcp_linear_m_s2: 2.0
+        tcp_angular_rad_s2: 5.0
+      # null disables the limit; otherwise [Fx, Fy, Fz, Mx, My, Mz] in N / N*m.
+      max_tcp_contact_wrench: null
+    gripper:
+      backend: "lktech"
+      name: "lktech_dual"
+      # Stable by-path symlinks (CH340 adapters share VID/SN, /dev/ttyUSBN shifts).
+      #   USB hub 9.4 = LEFT gripper, 9.1 = RIGHT gripper (2026-06-12, verified by operator).
+      port:
+        - "${oc.env:R1_LEFT_GRIPPER_PORT,/dev/serial/by-path/pci-0000:80:14.0-usb-0:9.4:1.0-port0}"
+        - "${oc.env:R1_RIGHT_GRIPPER_PORT,/dev/serial/by-path/pci-0000:80:14.0-usb-0:9.1:1.0-port0}"
+      motor_id: [1, 1]
+      # The control stream slot is NORMALIZED [0,1] (Quest writes 1 - trigger;
+      # ReplayTeleoperator likewise emits width->normalized), so control must be
+      # "normalized". Physical width (cosine-law w = 2 * L * sin(theta / 2)) is
+      # still recorded in the 4-wide tail [L_grip_width_m, ...] via the wrapper.
+      value_mode: "normalized"
+      command_value_mode: "normalized"
+      # Isosceles-triangle leg length L (meters). The opening width is linear in L.
+      arm_length_m: 0.06543
+      # Fully-open gripper apex angle theta_max (degrees), set manually (the
+      # calibrated motor max angle is only a reference). max_width is derived as
+      # 2 * L * sin(theta_max / 2); width commands beyond it are clipped.
+      apex_angle_max_deg: 90.0
+      # Transmission ratio (motor deg per jaw deg, jaw:motor = 1:10). The apex limit
+      # is a JAW angle but calibration is in MOTOR deg, so it is converted via this
+      # ratio before clipping the open-travel endpoint.
+      gear_ratio: 10.0
+      # min_width/max_width are optional: the physical range is derived from
+      # arm_length_m + apex_angle_max_deg (closed = 0,
+      # max = 2 * L * sin(apex_angle / 2)) and clipped there.
+      min_vel: 0.0
+      max_vel: 1.0
+      min_encoder: null
+      max_encoder: null
+      calibration_directory: "~/.cache/teleop_lktech_calib"
+      auto_calibrate: true
+      min_torque_iq: -40
+      max_torque_iq: 40
+      wait_timeout: 5.0
+      tool_name: "lktech"
+    gripper_iq_force_limit: [80.0, 80.0]
+    gripper_force_print_period: 1.0
+    signal_files: ${runtime.signal_files}
+    home:
+      preset_index: ${robot.home}
+      presets:
+        # Both arms home to [80, 60, 20, 80, 40, 15, 0] deg (values below in RADIANS,
+        # since Flexiv RDK joint targets/states are radians). On home/startup each
+        # arm DRIVES to this joint pose (no longer a no-move anchor).
+        - name: "rizon_dual_home_deg"
+          description: "Both arms -> [80,60,20,80,40,15,0] deg"
+          joints_left: [1.396263, 1.047198, 0.349066, 1.396263, 0.698132, 0.261799, 0.0]
+          joints_right: [1.396263, 1.047198, 0.349066, 1.396263, 0.698132, 0.261799, 0.0]
+
+  # ---- YAM head arm in REPLAY mode: follows recorded head tcp/cmd via IK ----
+  - class: "YamHeadRobot"
+    device_class_id: 2
+    state_feedback:
+      fps: 60.0
+      buffer_size: 100
+      hardware_latency_ms: 5.0
+      format:
+        shape: [20]
+        dtype: "float64"
+        # Six joints, commanded TCP pose, then measured TCP pose; quaternions XYZW.
+        type: [j1-6, xyz, qxqyqzqw, xyz, qxqyqzqw]
+    teleop_device_name: "ReplayTeleoperator"
+    teleop_device_class_id: 0
+    # Drive the head from the recorded EE-pose stream (ReplayTeleoperator_0_head_cmd)
+    # instead of the live Quest head pose. IK -> joints -> slew publisher.
+    head_pose_replay: true
+    yam_channel: "can0"
+    yam_arm: "yam"
+    yam_gripper: "no_gripper"
+    yam_sim: false
+    yam_ee_site: "grasp_site"
+    yam_initial_q: "0,2.4,0.95,1.15,0,0"
+    ramp_duration_s: 5
+    home_to_zero_on_exit: true
+    yam_orientation_mode: "relative"
+    yam_pos_scale: 1.0
+    yam_workspace_radius: 0.35
+    yam_max_step: 0.03
+    yam_ik_max_iters: 30
+    yam_ik_soft_pos_tol: 0.02
+    yam_ik_soft_ori_tol: 0.10
+    yam_head_filter_tau: 0.06
+    use_publisher: true
+    yam_publisher_hz: 143.0
+    yam_publisher_vmax: null
+    yam_publisher_amax: 50.0

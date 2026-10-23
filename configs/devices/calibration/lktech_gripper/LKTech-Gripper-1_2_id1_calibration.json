@@ -1,0 +1,15 @@
+{
+  "label": "left",
+  "port": "/dev/ttyUSB0",
+  "motor_id": 1,
+  "min_angle_deg": 1288.68,
+  "max_angle_deg": 2301.33,
+  "gear_ratio": 10.0,
+  "saved_at_epoch": 1791457534.6708019,
+  "gripper_type": "soft",
+  "min_torque_iq": -40,
+  "max_torque_iq": 190,
+  "arm_length_m": 0.06543,
+  "apex_angle_max_deg": 90.0,
+  "max_width": 0.0925319933860716
+}

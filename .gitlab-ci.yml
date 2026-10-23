@@ -1,0 +1,521 @@
+# SuperInference CI/CD policy.
+#
+# The default merge-request pipeline is deliberately hardware-free.  Model,
+# incubator, vendor, and robot-lab checks have separate jobs below so that a
+# missing SDK or an unavailable runner cannot hide a core runtime regression.
+
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    # Avoid a duplicate branch pipeline when GitLab already creates an MR
+    # pipeline for the same commit.
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS'
+      when: never
+    # Keep branch pushes useful before an MR exists; the rule above still
+    # suppresses the duplicate once an MR pipeline is active.
+    - if: '$CI_COMMIT_BRANCH'
+    - if: '$CI_COMMIT_TAG'
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+    - when: never
+
+stages:
+  - maintenance
+  - lint
+  - test
+  - optional
+
+default:
+  # The core runtime and current robot workstations support Python 3.10;
+  # vendor/model jobs may override this image for their stack.
+  image: python:3.10-slim
+  interruptible: true
+  retry:
+    max: 1
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+
+variables:
+  # The changed-range pre-commit job needs the MR target commit available.
+  GIT_DEPTH: "0"
+  GIT_SUBMODULE_STRATEGY: none
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  PYTHONDONTWRITEBYTECODE: "1"
+  PYTHONUNBUFFERED: "1"
+
+cache:
+  key:
+    files:
+      - requirements/requirements.txt
+      - requirements/requirements-dev.txt
+  paths:
+    - .cache/pip/
+
+# Pipeline Schedules run this job on GitLab runners, never a developer
+# workstation. It refreshes the README status table on a bot branch and opens
+# (or refreshes) a Merge Request; it never changes submodule gitlinks or merges that MR.
+update_submodules_mr:
+  stage: maintenance
+  # This full image bundles Git and curl, so the maintenance job does not
+  # depend on a live Debian package mirror at runtime.
+  image: python:3.10-bookworm
+  interruptible: false
+  retry: 0
+  resource_group: submodule-update
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - when: never
+  variables:
+    GIT_STRATEGY: fetch
+    GIT_SUBMODULE_STRATEGY: none
+    SUBMODULE_UPDATE_BRANCH: fix/automation-update-submodules
+  before_script:
+    - git --version
+    - curl --version
+    - git config --global --add safe.directory "$CI_PROJECT_DIR"
+    - >-
+      case "$SUBMODULE_UPDATE_BRANCH" in
+        feat/?*|fix/?*|lab/?*) ;;
+        *) echo "SUBMODULE_UPDATE_BRANCH must match ^(feat|fix|lab)/.+$." >&2; exit 2 ;;
+      esac
+    - >-
+      test -n "${SUBMODULE_UPDATE_TOKEN:-}" ||
+      (echo "SUBMODULE_UPDATE_TOKEN must be configured as a masked CI/CD variable." >&2; exit 2)
+    - >-
+      test -n "${SUBMODULE_UPDATE_USERNAME:-}" ||
+      (echo "SUBMODULE_UPDATE_USERNAME must be configured as the Group Access Token Bot username." >&2; exit 2)
+    - >-
+      test "${SUBMODULE_UPDATE_TOKEN}" != "${CI_JOB_TOKEN:-}" ||
+      (echo "SUBMODULE_UPDATE_TOKEN must be a Group Access Token, not CI_JOB_TOKEN." >&2; exit 2)
+    - |
+      if [ -n "${CI_API_V4_URL:-}" ]; then
+        api_v4_url="${CI_API_V4_URL%/}"
+      elif [ -n "${CI_SERVER_URL:-}" ]; then
+        api_v4_url="${CI_SERVER_URL%/}/api/v4"
+      elif [ -n "${CI_SERVER_HOST:-}" ]; then
+        api_v4_url="${CI_SERVER_PROTOCOL:-https}://${CI_SERVER_FQDN:-$CI_SERVER_HOST}/api/v4"
+      else
+        echo "GitLab API URL is unavailable; CI_SERVER_HOST is not set." >&2
+        exit 2
+      fi
+      case "$api_v4_url" in
+        http://*|https://*) export SUBMODULE_UPDATE_API_URL="${api_v4_url%/}" ;;
+        *) echo "GitLab API URL must use http:// or https://." >&2; exit 2 ;;
+      esac
+    # GitLab Runner can install a repo-local CI_JOB_TOKEN credential helper.
+    # This longer source prefix maps sibling URLs and the SSH-form parent
+    # origin to the Group Bot credentials before Git selects a helper.
+    - >-
+      git config --global
+      url."https://${SUBMODULE_UPDATE_USERNAME}:${SUBMODULE_UPDATE_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_NAMESPACE}/".insteadOf
+      "git@${CI_SERVER_HOST}:${CI_PROJECT_NAMESPACE}/"
+    - git config --global url."https://$CI_SERVER_HOST/".insteadOf "git@$CI_SERVER_HOST:"
+    - git config --global url."https://github.com/".insteadOf "git@github.com:"
+    - git remote set-url origin "git@$CI_SERVER_HOST:$CI_PROJECT_PATH.git"
+    - git config user.name "SuperInference Submodule Bot"
+    - git config user.email "submodule-bot@$CI_SERVER_HOST"
+    - git fetch origin "$CI_DEFAULT_BRANCH"
+    - |
+      set -e
+      remote_bot_refs="$(git ls-remote --heads origin "refs/heads/$SUBMODULE_UPDATE_BRANCH")" || {
+        ls_remote_status=$?
+        echo "Unable to inspect the remote bot branch (git ls-remote exit $ls_remote_status)." >&2
+        exit "$ls_remote_status"
+      }
+      if [ -n "$remote_bot_refs" ]; then
+        git fetch origin \
+          "+refs/heads/$SUBMODULE_UPDATE_BRANCH:refs/remotes/origin/$SUBMODULE_UPDATE_BRANCH"
+      else
+        git update-ref -d "refs/remotes/origin/$SUBMODULE_UPDATE_BRANCH"
+      fi
+    - >-
+      if git show-ref --verify --quiet "refs/remotes/origin/$SUBMODULE_UPDATE_BRANCH" &&
+      git merge-base "origin/$CI_DEFAULT_BRANCH" "origin/$SUBMODULE_UPDATE_BRANCH" >/dev/null 2>&1 &&
+      [ "$(git diff --name-only "origin/$CI_DEFAULT_BRANCH...origin/$SUBMODULE_UPDATE_BRANCH")" = "README.md" ];
+      then
+        git switch -C "$SUBMODULE_UPDATE_BRANCH" "origin/$SUBMODULE_UPDATE_BRANCH";
+        git merge --no-edit "origin/$CI_DEFAULT_BRANCH";
+      else
+        git switch -C "$SUBMODULE_UPDATE_BRANCH" "origin/$CI_DEFAULT_BRANCH";
+      fi
+    - python --version
+    - python -m pip install --upgrade pip
+    - python -m pip install -r requirements/requirements-dev.txt
+  script:
+    - mkdir -p .tmp
+    - python scripts/maintenance/update_submodules.py --report .tmp/submodule-update-report.md
+    - >-
+      python -m ruff check --select E9,F63,F7,F82
+      consumer/inference/common consumer/policy_history
+      device_starter.py windows_device_start.py
+      devices/__init__.py devices/camera.py devices/cameras
+      devices/robots/base.py devices/robots/rizon
+      manager tests utils/contracts.py utils/config_schema.py utils/lk_gripper_presets.py
+    - >-
+      python -m pytest tests -q
+      -m "not hardware and not manual"
+      --ignore=tests/test_lingbot_va_rtc.py
+    - >-
+      if ! git diff --quiet -- third_party || ! git diff --cached --quiet -- third_party;
+      then echo "Submodule status refresh must not modify gitlinks." >&2; exit 1; fi
+    - |
+      set -euo pipefail
+      if git diff --quiet -- README.md; then
+        bot_branch_diff=""
+        if git show-ref --verify --quiet "refs/remotes/origin/$SUBMODULE_UPDATE_BRANCH"; then
+          if git merge-base "origin/$CI_DEFAULT_BRANCH" "origin/$SUBMODULE_UPDATE_BRANCH" >/dev/null 2>&1; then
+            bot_branch_diff="$(git diff --name-only "origin/$CI_DEFAULT_BRANCH...origin/$SUBMODULE_UPDATE_BRANCH")"
+          else
+            bot_branch_diff="__unrelated_history__"
+          fi
+        fi
+        if [ -z "$bot_branch_diff" ]; then
+          echo "No enabled submodule status records changed; no Merge Request created."
+          exit 0
+        fi
+        if [ "$bot_branch_diff" != "README.md" ]; then
+          echo "Resetting legacy bot branch to the default branch."
+          git push --force-with-lease origin "HEAD:$SUBMODULE_UPDATE_BRANCH"
+          echo "No enabled submodule status records changed; no Merge Request created."
+          exit 0
+        fi
+        local_bot_branch_diff="$(git diff --name-only "origin/$CI_DEFAULT_BRANCH"...HEAD)"
+        if [ -z "$local_bot_branch_diff" ]; then
+          echo "Resetting already-merged bot branch to the default branch."
+          git push --force-with-lease origin \
+            "refs/remotes/origin/$CI_DEFAULT_BRANCH:refs/heads/$SUBMODULE_UPDATE_BRANCH"
+          echo "No enabled submodule status records changed; no Merge Request created."
+          exit 0
+        fi
+        if [ "$local_bot_branch_diff" != "README.md" ]; then
+          echo "Bot branch may differ from the default branch only in README.md." >&2
+          exit 1
+        fi
+        echo "Reusing existing README-only bot branch; ensuring its Merge Request exists."
+      else
+        git diff -- README.md
+        git add -- README.md
+        if [ "$(git diff --cached --name-only)" != "README.md" ]; then
+          echo "Submodule status refresh must stage only README.md." >&2
+          exit 1
+        fi
+        git commit -m "chore: refresh submodule status"
+        if [ "$(git diff --name-only "origin/$CI_DEFAULT_BRANCH"...HEAD)" != "README.md" ]; then
+          echo "Bot branch may differ from the default branch only in README.md." >&2
+          exit 1
+        fi
+        git push --force-with-lease origin "HEAD:$SUBMODULE_UPDATE_BRANCH"
+      fi
+
+      mr_iid="$(curl --fail-with-body --silent --show-error \
+        --header "PRIVATE-TOKEN: $SUBMODULE_UPDATE_TOKEN" \
+        --get --data-urlencode state=opened \
+        --data-urlencode "source_branch=$SUBMODULE_UPDATE_BRANCH" \
+        --url "$SUBMODULE_UPDATE_API_URL/projects/$CI_PROJECT_ID/merge_requests" | \
+        python -c 'import json, sys; items = json.load(sys.stdin); print(items[0]["iid"] if items else "")')"
+      if [ -n "$mr_iid" ]; then
+        echo "Updated existing Merge Request !$mr_iid."
+      else
+        curl --fail-with-body --silent --show-error --request POST \
+          --header "PRIVATE-TOKEN: $SUBMODULE_UPDATE_TOKEN" \
+          --form "source_branch=$SUBMODULE_UPDATE_BRANCH" \
+          --form "target_branch=$CI_DEFAULT_BRANCH" \
+          --form "title=chore: refresh submodule status" \
+          --form "description=<${CI_PROJECT_DIR}/.tmp/submodule-update-report.md" \
+          --url "$SUBMODULE_UPDATE_API_URL/projects/$CI_PROJECT_ID/merge_requests"
+      fi
+  artifacts:
+    when: always
+    paths:
+      - .tmp/submodule-update-report.md
+    expire_in: 1 week
+
+.python_dev:
+  before_script:
+    - python --version
+    - python -m pip install --upgrade pip
+    - python -m pip install -r requirements/requirements-dev.txt
+
+# This is the blocking Ruff layer.  It catches syntax and undefined-name
+# regressions in the maintained runtime/test paths without requiring optional
+# hardware or model packages.
+ruff_contract:
+  extends: .python_dev
+  stage: lint
+  script:
+    - python -m compileall -q consumer devices manager policy utils tests scripts
+    - >-
+      python -m ruff check --select E9,F63,F7,F82
+      consumer/inference/common consumer/policy_history
+      device_starter.py windows_device_start.py
+      devices/__init__.py devices/camera.py devices/cameras
+      devices/robots/base.py devices/robots/rizon
+      manager tests utils/contracts.py utils/config_schema.py utils/lk_gripper_presets.py
+
+# The repository still contains historical code that is not format-clean.  Keep
+# the complete report visible while the debt is paid down; this job is
+# intentionally non-blocking until the full tree is clean.
+ruff_full:
+  extends: .python_dev
+  stage: lint
+  allow_failure: true
+  script:
+    - |
+      set +e
+      python -m ruff check .
+      check_status=$?
+      python -m ruff format --check .
+      format_status=$?
+      if [ "$check_status" -ne 0 ] || [ "$format_status" -ne 0 ]; then
+        exit 1
+      fi
+
+# Generic file hygiene and the local Ruff contract are shared with developers.
+pre_commit:
+  extends: .python_dev
+  stage: lint
+  image: python:3.10-bookworm
+  before_script:
+    # The full image bundles Git, which pre-commit needs to resolve changed
+    # ranges and create hook environments without a runtime apt dependency.
+    - git --version
+    - git config --global --add safe.directory "$CI_PROJECT_DIR"
+    - python --version
+    - python -m pip install --upgrade pip
+    - python -m pip install -r requirements/requirements-dev.txt
+  script:
+    - |
+      set -eu
+      if [ -n "${CI_MERGE_REQUEST_TARGET_BRANCH_SHA:-}" ] && [ "${CI_MERGE_REQUEST_TARGET_BRANCH_SHA}" != "0000000000000000000000000000000000000000" ]; then
+        python -m pre_commit run \
+          --from-ref "${CI_MERGE_REQUEST_TARGET_BRANCH_SHA}" \
+          --to-ref "${CI_COMMIT_SHA}" \
+          --show-diff-on-failure
+      elif [ -n "${CI_COMMIT_BEFORE_SHA:-}" ] && [ "${CI_COMMIT_BEFORE_SHA}" != "0000000000000000000000000000000000000000" ]; then
+        python -m pre_commit run \
+          --from-ref "${CI_COMMIT_BEFORE_SHA}" \
+          --to-ref "${CI_COMMIT_SHA}" \
+          --show-diff-on-failure
+      else
+        echo "No usable base SHA; checking files changed by this commit."
+        git diff-tree --root --no-commit-id --name-only -r -z "${CI_COMMIT_SHA}" |
+          xargs -0 -r python -m pre_commit run --show-diff-on-failure --files
+      fi
+
+root_tests:
+  extends: .python_dev
+  stage: test
+  image: python:3.10-bookworm
+  before_script:
+    # Manifest tests inspect .gitmodules and the bound gitlinks in HEAD. The
+    # checkout remains non-recursive; the full image supplies Git without
+    # initializing a submodule or contacting a package mirror.
+    - git --version
+    - git config --global --add safe.directory "$CI_PROJECT_DIR"
+    - python --version
+    - python -m pip install --upgrade pip
+    - python -m pip install -r requirements/requirements-dev.txt
+  script:
+    - >-
+      python -m pytest tests -q
+      -m "not hardware and not manual"
+      --ignore=tests/test_lingbot_va_rtc.py
+      --junitxml=junit-root.xml
+  artifacts:
+    when: always
+    reports:
+      junit: junit-root.xml
+    expire_in: 1 week
+
+# These jobs make the contract being exercised obvious in an MR and provide a
+# faster failure signal when a focused area changes.  root_tests remains the
+# complete core gate.
+config_contracts:
+  extends: .python_dev
+  stage: test
+  rules:
+    - changes:
+        - configs/**/*
+        - utils/config_schema.py
+        - tests/config/**/*
+        - tests/architecture/test_dependency_profiles.py
+    - when: never
+  script:
+    - python -m pytest tests/config tests/architecture/test_dependency_profiles.py -q
+
+device_contracts:
+  extends: .python_dev
+  stage: test
+  rules:
+    - changes:
+        - devices/**/*
+        - tests/devices/**/*
+        - tests/config/test_registry_references.py
+    - when: never
+  script:
+    - >-
+      python -m pytest tests/devices -q
+      -m "not hardware and not manual"
+
+shm_contracts:
+  extends: .python_dev
+  stage: test
+  rules:
+    - changes:
+        - utils/contracts.py
+        - utils/shm_utils.py
+        - consumer/**/*
+        - manager/**/*
+        - tests/utils/test_contracts.py
+        - tests/utils/test_shm_utils.py
+        - tests/consumer/**/*
+        - tests/manager/**/*
+        - tests/test_action_executor_aligned_chunk_logging.py
+        - tests/test_chunk_manager_auto_drop.py
+        - tests/test_smooth_chunk_manager.py
+    - when: never
+  script:
+    - >-
+      python -m pytest
+      tests/utils/test_contracts.py
+      tests/utils/test_shm_utils.py
+      tests/consumer
+      tests/manager
+      tests/test_action_executor_aligned_chunk_logging.py
+      tests/test_chunk_manager_auto_drop.py
+      tests/test_smooth_chunk_manager.py
+      -m "not hardware and not manual"
+      -q
+
+entrypoint_help:
+  extends: .python_dev
+  stage: test
+  script:
+    - python device_starter.py --help
+    - python windows_device_start.py --help
+    - python scripts/legacy/move_lk_gripper.py --help
+    - python scripts/benchmark/test_trajectory_planner.py --help
+
+# Optional model-stack validation.  The torch wheel must match the runner; do
+# not move this installation into the default root job.
+model_tests:
+  extends: .python_dev
+  stage: optional
+  allow_failure: true
+  variables:
+    # The protected model runner must have credentials for this submodule.
+    GIT_SUBMODULE_STRATEGY: none
+  rules:
+    - changes:
+        - tests/test_lingbot_va_rtc.py
+        - third_party/nmx_vla/**/*
+        - consumer/inference/**/*
+        - policy/**/*
+      when: manual
+    - when: manual
+  before_script:
+    - python --version
+    - python -m pip install --upgrade pip
+    - python -m pip install -r requirements/requirements-dev.txt
+    - python -m pip install -r requirements/requirements-policy.txt
+    - >-
+      test -f third_party/nmx_vla/requirements.txt ||
+      (echo "Initialize third_party/nmx_vla on the protected model runner first." >&2; exit 2)
+    - python -m pip install -r third_party/nmx_vla/requirements.txt
+    - python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+  script:
+    - python -m pytest tests/test_lingbot_va_rtc.py -q --junitxml=junit-model.xml
+  artifacts:
+    when: always
+    reports:
+      junit: junit-model.xml
+    expire_in: 1 week
+
+# The panel is an incubator application with its own dependency and data
+# boundary.  It is never folded into root_tests.
+control_panel_tests:
+  extends: .python_dev
+  stage: optional
+  allow_failure: true
+  rules:
+    - changes:
+        - incubator/control_panel/**/*
+        - configs/**/*
+      when: manual
+    - when: manual
+  before_script:
+    - python --version
+    - python -m pip install --upgrade pip
+    - python -m pip install -r requirements/requirements-dev.txt
+    # Panel tests own the hardware/script-side Python dependencies; they are
+    # intentionally absent from the root image and root gate.
+    - >-
+      python -m pip install
+      -r requirements/requirements-hardware.txt
+      -r requirements/requirements-scripts.txt
+  script:
+    - mkdir -p "$CI_PROJECT_DIR/.tmp/xdg-panel-$CI_JOB_ID"
+    - export XDG_DATA_HOME="$CI_PROJECT_DIR/.tmp/xdg-panel-$CI_JOB_ID"
+    - python -m pytest incubator/control_panel/tests -q --junitxml=junit-panel.xml
+  artifacts:
+    when: always
+    reports:
+      junit: junit-panel.xml
+    expire_in: 1 week
+
+# Real hardware jobs must run on a protected, explicitly tagged runner and
+# remain operator-triggered.  Set up vendor SDKs on that runner, not here.
+hardware_contracts:
+  extends: .python_dev
+  stage: optional
+  allow_failure: true
+  # Never cancel a hardware probe halfway through an operator-supervised run.
+  interruptible: false
+  # A runner failure requires an operator state check before another probe.
+  retry: 0
+  tags:
+    - robot-lab
+  rules:
+    - when: manual
+  before_script:
+    - python --version
+    - python -m pip install --upgrade pip
+    # This profile supplies pytest plus the OpenCV/serial/simulation packages
+    # needed by import contracts. Vendor SDKs remain runner-managed.
+    - >-
+      python -m pip install
+      -r requirements/requirements-dev.txt
+      -r requirements/requirements-hardware.txt
+  script:
+    - python -m pytest tests -q -m "hardware and not manual"
+
+# Third-party submodules own their own test environments.  This job is a
+# manual hook for release or submodule-upgrade validation and does not affect
+# the default MR gate.
+third_party_tests:
+  extends: .python_dev
+  stage: optional
+  allow_failure: true
+  rules:
+    - changes:
+        - third_party/**/*
+        - .gitmodules
+      when: manual
+    - when: manual
+  script:
+    - >-
+      if [ ! -d third_party ]; then
+        echo "third_party checkout is unavailable; use a protected vendor runner." >&2;
+        exit 2;
+      fi
+    - >-
+      if find third_party -type d -name tests -print -quit | grep -q .;
+      then
+        find third_party -type d -name tests -print0 |
+        xargs -0 -r -n1 python -m pytest -q;
+      else
+        echo "No initialized third-party test directories; initialize submodules before this job." >&2;
+        exit 2;
+      fi

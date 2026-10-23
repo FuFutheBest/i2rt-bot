@@ -1,0 +1,4 @@
+interface:
+  display_name: "FastWAM Inference Runtime"
+  short_description: "Maintain FastWAM, memory, and FasterWAM runtime"
+  default_prompt: "Use $fastwam-inference-runtime to modify or diagnose FastWAM, FastWAM-memory, or FasterWAM server/client contracts."

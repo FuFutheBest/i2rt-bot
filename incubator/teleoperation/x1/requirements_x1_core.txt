@@ -1,0 +1,74 @@
+# =============================================================================
+# requirements_x1_core.txt
+# X1 Quest3 遥操作 + NEDF3 采集 —— 本次调通时手动改动的「关键差异包」精简清单。
+#
+# 这不是完整环境(完整见 tvenv_requirements.txt)，只列重建环境必须手动处理的包，
+# 已去掉传递依赖。容器 robot_test / venv=/root/tvenv (Python 3.10, system-site-packages=on)。
+#
+# 重要约束：numpy 必须 < 2（nmx_nedf_api / nmxrdk 要求），而最新 rerun-sdk 要求 numpy>=2，
+# 所以 rerun 必须钉在支持 numpy<2 的旧版(0.23.1)。两者顺序见文末「重建步骤」。
+# =============================================================================
+
+# ---- 强约束：版本必须钉死 ----
+numpy==1.26.4            # < 2，满足 nmx_nedf_api / nmxrdk；勿被 rerun 顶到 2.x
+rerun-sdk==0.23.1        # 支持 numpy<2 的版本（最新版强依赖 numpy>=2，不可用）
+protobuf==3.20.3         # nmx_msg 强依赖，勿升级
+
+# ---- 本次补装（采集 saver 链路所需）----
+imageio==2.37.3
+h5py==3.16.0
+
+# ---- 项目运行所需（summary 中已列，按需确保存在）----
+omegaconf
+hydra-core
+pandas
+plotly
+dash
+matplotlib
+pynput                   # 仅 GUI 模式键盘用；headless 容器导入会失败，
+                         # 代码已改为可选导入(缺失自动降级)，故装不装都不阻塞采集
+
+# ---- 本地 wheel（aarch64，无法从公网 pip 安装）----
+# 位于容器 /root/nmx_package_aarch64/ ，复现到别的机器需带上这些 wheel：
+#   nmx_nedf_api-0.3.1-cp310-cp310-manylinux_2_31_aarch64.whl   # NEDF3 写盘
+#   nm_storage_api-0.3.2-cp310-cp310-manylinux_2_31_aarch64.whl # 存储 API
+# 安装：pip install /root/nmx_package_aarch64/nmx_nedf_api-0.3.1-*.whl \
+#                   /root/nmx_package_aarch64/nm_storage_api-0.3.2-*.whl
+
+# ---- 系统预装(容器自带 /usr/local/lib/python3.10/dist-packages)，勿在 venv 重装 ----
+# nmxrdk==2.2.8           # X1 机器人 SDK
+# nmx_msg==2.4.4          # 必须用 2.4.4 匹配 nmxrdk(含 GripperMaxForce)；
+#                         # 切勿在 venv 装 nmx_msg==2.2.0，会盖住系统版导致 X1Robot 崩溃
+# nmxrt==2.6.1            # RT 运行时
+# opencv-python-headless==4.13.0.92
+
+# =============================================================================
+# 重建步骤（顺序重要）
+# -----------------------------------------------------------------------------
+# 0) 进容器 + 激活 venv：
+#      docker exec -it robot_test bash
+#      source /root/tvenv/bin/activate
+#
+# 1) 确保 venv 不残留旧 nmx_msg（让其回退到系统 2.4.4）：
+#      pip uninstall -y nmx_msg
+#
+# 2) 装本地 wheel（若尚未装）：
+#      pip install /root/nmx_package_aarch64/nmx_nedf_api-0.3.1-*.whl \
+#                  /root/nmx_package_aarch64/nm_storage_api-0.3.2-*.whl
+#
+# 3) 钉关键版本 + 补依赖（一条命令，避免 rerun 把 numpy 顶上去）：
+#      pip install "numpy==1.26.4" "rerun-sdk==0.23.1" "protobuf==3.20.3" \
+#                  imageio==2.37.3 h5py==3.16.0 \
+#                  omegaconf hydra-core pandas plotly dash matplotlib
+#
+# 4) 验证（期望 numpy 1.26.4 + 两个 OK）：
+#      cd /root/SuperInference
+#      python -c "import nmxrdk, nmx_nedf_api, rerun, numpy, imageio, h5py, cv2; \
+#                 print('numpy', numpy.__version__); print('all import OK')"
+#      python -c "import r1_async_data_saver_NEDF3_x1; print('saver import OK')"
+#
+# 可忽略的 pip 警告：
+#   - nmx-nedf-api requires nmx-msg==2.2.0 (我们故意用 2.4.4，是超集)
+#   - opencv-python-headless requires numpy>=2 (元数据 pin 过严，实测配 1.26.4 正常)
+# =============================================================================
+

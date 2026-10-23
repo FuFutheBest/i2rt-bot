@@ -1,0 +1,4 @@
+device_manager:
+  type: synchronized
+  params:
+    config_path: ${hydra:runtime.output_dir}/config_resolved.yaml

@@ -1,0 +1,36 @@
+# Top-level config for X1 (TJ / nmxrdk) Quest3 VR teleop + data collection.
+#
+# Launch:  python device_starter.py --config-path configs --config-name quest3_collect_x1
+#
+# device_manager is ON: it aggregates X1Robot state + camera frames into the
+# summary SHM (device_summary_data) for the NEDF3 data saver
+# (r1_async_data_saver_NEDF3_x1.py).
+defaults:
+  - devices: quest3_collect_x1
+  - device_manager: base
+  - action_executor: default
+  - consumer: default
+  - runtime: default
+  - _self_
+
+device_manager:
+  device_manager:
+    params:
+      buffer_size: 100
+
+robot:
+  home: 0
+
+global_settings:
+  log_level: INFO
+  restart_on_failure: false
+  max_restart_attempts: 3
+  restart_delay: 2.0
+
+runtime:
+  enable_device_manager: true
+
+hydra:
+  run:
+    dir: .
+  output_subdir: null

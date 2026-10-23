@@ -1,0 +1,40 @@
+# Top-level config for NEDF3 *R1-schema* data collection on the Quest3/Flexiv/YAM rig.
+# Launch:  python device_starter.py --config-path configs --config-name quest3_collect_r1
+# Then run the R1 NEDF3 saver against device_summary_data:
+#   python -m incubator.r1.async_data_saver_NEDF3_r1 \
+#       --config configs/quest3_collect_r1.yaml -o saved_data -t <task_name>
+defaults:
+  - devices: quest3_collect_r1
+  - device_manager: base
+  - action_executor: default
+  - consumer: default
+  - runtime: r1_cpu_24core
+  - _self_
+
+device_manager:
+  device_manager:
+    params:
+      buffer_size: 100
+
+camera:
+  right_capture_id: "/dev/v4l/by-path/pci-0000:80:14.0-usb-0:4:1.0-video-index0"
+  left_capture_id: "/dev/v4l/by-path/pci-0000:80:14.0-usb-0:8:1.0-video-index0"
+  head_capture_id: "/dev/v4l/by-path/pci-0000:80:14.0-usb-0:6.1:1.0-video-index0"
+
+robot:
+  home: 0
+
+nedf3_metadata:
+  hardware_string: "${oc.env:R1_HARDWARE_STRING,313}"
+  eef_wrench_calibration: false
+
+global_settings:
+  log_level: INFO
+  restart_on_failure: true
+  max_restart_attempts: 3
+  restart_delay: 2.0
+
+hydra:
+  run:
+    dir: .
+  output_subdir: null

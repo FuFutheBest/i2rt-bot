@@ -1,0 +1,4 @@
+interface:
+  display_name: "FastWAM RTC Guidance"
+  short_description: "Implement and validate FastWAM RTC Jacobian guidance"
+  default_prompt: "Use $fastwam-rtc-guidance to implement or review FastWAM RTC prefix guidance."

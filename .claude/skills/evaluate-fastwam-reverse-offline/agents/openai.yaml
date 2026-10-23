@@ -1,0 +1,4 @@
+interface:
+  display_name: "FastWAM Offline Evaluation"
+  short_description: "Audit reverse-temporal FastWAM actions"
+  default_prompt: "Use $evaluate-fastwam-reverse-offline for a read-only FastWAM temporal-order audit."

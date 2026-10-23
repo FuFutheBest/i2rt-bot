@@ -1,0 +1,59 @@
+# Rizon single-arm EEF absolute control with an iPhone camera.
+
+devices:
+- class: "IPhoneCameraDevice"
+  device_class_id: 0   # camera left
+  capture_id: ${camera.left_capture_id}
+  state_feedback:
+    fps: 30.0
+    buffer_size: 200
+    hardware_latency_ms: 100.0
+    format:
+      shape: [640, 480, 3]
+      dtype: "uint8"
+      type: rgb
+- class: "RizonRobot"
+  device_class_id: 1
+  robot_sn: "Rizon4-00044"
+  state_feedback:
+    fps: 120.0
+    buffer_size: 1000
+    hardware_latency_ms: 10.0
+    format:
+      shape: [22]
+      dtype: "float64"
+        # Joint position/velocity, TCP xyz, TCP quaternion (WXYZ), gripper.
+      type: [j1-7, dq1-7, xyz, qwqxqyqz, gripper]
+  control:
+    type: eef_abs    # joints | eef_abs | eef_rel
+    execution:
+      mode: synchronous    # synchronous | legacy_async
+      fps: 100.0
+    buffer_size: 100
+    format:
+      shape: [8]
+      dtype: "float64"
+        # Absolute TCP xyz, TCP quaternion (XYZW), then gripper command.
+      type: [xyz, qxqyqzqw, gripper]
+    cartesian_impedance:
+      translation_n_m: [10000.0, 10000.0, 10000.0]
+      rotation_nm_rad: [1500.0, 1500.0, 1500.0]
+  motion_limits:
+    velocity:
+      joints_rad_s: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+      tcp_linear_m_s: 1.0
+      tcp_angular_rad_s: 2.0
+    acceleration:
+      joints_rad_s2: [2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0]
+      tcp_linear_m_s2: 2.0
+      tcp_angular_rad_s2: 5.0
+      # null disables the limit; otherwise [Fx, Fy, Fz, Mx, My, Mz] in N / N*m.
+    max_tcp_contact_wrench:
+  gripper:
+    backend: "flexiv"
+    name: "GripperDahuanModbus"
+    tool_name: "GripperDahuanModbusiPhone"
+  home:
+    joints_left:
+    joints_right:
+  signal_files: ${runtime.signal_files}

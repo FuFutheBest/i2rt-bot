@@ -1,0 +1,4 @@
+interface:
+  display_name: "LingBotVA RTC"
+  short_description: "Maintain LingBotVA real-time control inference."
+  default_prompt: "Use this skill when changing LingBotVA RTC inference, latency tracking, or chunk-prefix smoothing."

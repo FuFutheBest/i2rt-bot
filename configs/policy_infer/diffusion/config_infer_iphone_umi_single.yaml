@@ -1,0 +1,97 @@
+# @package _global_
+
+defaults:
+  - /devices/infer@devices: rizon_single_eef_abs_iphone_umi
+  - /device_manager: sync
+  - /action_executor: base
+  - /consumer: default
+  - /runtime: default
+  - _self_
+
+device_manager:
+  device_manager:
+    master_device_class_id: 1
+    params:
+      buffer_size: 100000
+
+# Camera configuration - modify these to change camera IDs
+camera:
+  left_capture_id: 0
+
+shared:
+  summary_shm_name: device_summary_data
+
+global_settings:
+  log_level: INFO
+  restart_on_failure: true
+  max_restart_attempts: 3
+  restart_delay: 2.0
+
+hydra:
+  run:
+    dir: .
+  output_subdir: null
+
+summary_shm: device_summary_data
+
+policy:
+  class: DiffusionPolicyIPhoneUMI
+  params:
+    # ckpt_dir: "/home/wendi/Desktop/dp_ckpt/2025.12.31/01.10.33_train_diffusion_unet_timm_single_frame_pourmsg_100_rel"
+    # ckpt_dir: "/home/wendi/Desktop/dp_ckpt/2025.12.31/04.11.25_train_diffusion_unet_timm_single_frame_pourmsg_200_rel"
+    # ckpt_dir: "/home/wendi/Desktop/dp_ckpt/2025.12.31/01.09.21_train_diffusion_unet_timm_single_frame_pourmsg_300_rel"
+    # ckpt_dir: "/home/wendi/Desktop/dp_ckpt/2026.01.04/15.18.25_train_diffusion_unet_timm_single_frame_desktop_50_rel"
+    # ckpt_dir: "/home/wendi/Desktop/dp_ckpt/2025.12.31/01.30.15_train_diffusion_unet_timm_single_frame_desktop_100_rel"
+    # ckpt_dir: "/home/wendi/Desktop/dp_ckpt/2025.12.31/03.26.44_train_diffusion_unet_timm_single_frame_desktop_200_rel"
+    # ckpt_dir: "/home/wendi/Desktop/dp_ckpt/2025.12.31/01.28.48_train_diffusion_unet_timm_single_frame_desktop_300_rel"
+    # ckpt_dir: "/home/wendi/Desktop/dp_ckpt/2025.12.31/11.34.10_train_diffusion_unet_timm_single_frame_blocksv2_100_rel"
+    # ckpt_dir: "/home/wendi/Desktop/dp_ckpt/2025.12.31/15.44.55_train_diffusion_unet_timm_single_frame_blocksv2_200_rel"
+    # ckpt_dir: "/home/wendi/Desktop/dp_ckpt/2025.12.31/11.34.06_train_diffusion_unet_timm_single_frame_blocksv2_300_rel"
+    # ckpt_dir: "/home/wendi/Desktop/dp_ckpt/2026.01.06/15.24.20_train_diffusion_unet_timm_single_frame_blocksv2_100_blocksv2_dagger_50_rel"
+    # ckpt_dir: "/home/wendi/Desktop/dp_ckpt/2026.01.07/00.06.10_train_diffusion_unet_timm_single_frame_blocksv2_100_blocksv2_dagger_v2_50_rel"
+    # ckpt_dir: "/home/wendi/Desktop/dp_ckpt/2026.01.07/16.43.04_train_diffusion_unet_timm_single_frame_blocksv2_100_blocksv2_dagger_v2_50_2"
+    # ckpt_dir: "/home/wendi/Desktop/dp_ckpt/2026.01.08/02.32.33_train_diffusion_unet_timm_single_frame_blocksv2_100_blocksv2_dagger_v2_50_rel_4xdagger"
+    # ckpt_dir: "/home/wendi/Desktop/dp_ckpt/2026.01.06/00.30.55_train_diffusion_unet_timm_single_frame_towel_100_rel"
+    # ckpt_dir: "/home/wendi/Desktop/dp_ckpt/2026.01.06/02.54.39_train_diffusion_unet_timm_single_frame_towel_200_rel"
+    # ckpt_dir: "/home/wendi/Desktop/dp_ckpt/2026.01.06/00.30.49_train_diffusion_unet_timm_single_frame_towel_300_rel"
+    ckpt_dir: "/home/wendi/Desktop/dp_ckpt/2026.03.27"
+    num_inference_steps: 8
+    device: "cuda"
+    obs_horizon: 1
+    tcp_umi_json_path: "calibration/tcp_to_umi_transform.json"
+    use_relative_action: true
+
+  fps: 0.8
+  control_fps: 10.0
+  # fps: 1.25
+  chunk_length: 8
+  robot_latency_steps: 0
+  manual_confirm: false
+  gripper_latency_steps: 0
+  obs:
+    devices:
+      - "IPhoneCameraDevice_0"
+      # - "HikCameraDevice_0"
+      - "RizonRobot_1"
+  controls:
+    - endpoint:
+        device: RizonRobot
+        device_class_id: 1
+        port: command
+      shape: [8]
+      dtype: "float64"
+  infer_recorder:
+    enabled: true
+    use_realsense: true
+    camera_id: 6
+    save_path: "/home/fangyuan/lt_ws/superinference_video"
+    width: 640
+    height: 480
+    fps: 30.0
+    scale: 0.4
+    realsense_serial: '819612073139'
+    show_window: true
+    enable_recording: true
+    auto_start_recording: true
+    record_key: "r"
+    window_name: "Inference Recorder"

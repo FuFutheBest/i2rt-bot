@@ -1,0 +1,292 @@
+# Target-specific three-camera device set for the chip 0710 rollout.
+# The policy observes only the two wrist cameras; the additional head camera is
+# published through DeviceManager so the NEDF3 recorder can save it without
+# changing the checkpoint observation contract.
+
+devices:
+- class: "WebCameraOpenPi"
+  device_class_id: 0
+  capture_id: ${camera.left_capture_id}
+  state_feedback:
+    fps: 30.0
+    buffer_size: 200
+    hardware_latency_ms: 0.0
+    format:
+      shape: [360, 640, 3]      # landscape H x W (raw, un-rotated)
+      dtype: "uint8"
+      type: rgb
+  usb_port_requirement: "any"
+  capture_fourcc: "MJPG"
+    # Empirically verified (2026-06-30) against training frames: the raw landscape
+    # frame already matches training orientation, so NO rotation is applied.
+  rotation_degrees: 0
+  capture_buffer_size: 1
+  camera_controls:
+    brightness: 80
+    contrast: 50
+    saturation: 120
+    hue: 0
+    gamma: 60
+    gain: 102
+    sharpness: 130
+    backlight: 40
+    auto_exposure: 3
+    auto_white_balance: 1
+    white_balance_temperature: 4664
+    power_line_frequency: 60
+    pan: 0
+    tilt: 0
+    autofocus: 0
+
+- class: "WebCameraOpenPi"
+  device_class_id: 1
+  capture_id: ${camera.right_capture_id}
+  state_feedback:
+    fps: 30.0
+    buffer_size: 200
+    hardware_latency_ms: 0.0
+    format:
+      shape: [360, 640, 3]      # landscape H x W (raw, un-rotated)
+      dtype: "uint8"
+      type: rgb
+  usb_port_requirement: "any"
+  capture_fourcc: "MJPG"
+    # Empirically verified (2026-06-30) against training frames: the raw landscape
+    # frame already matches training orientation, so NO rotation is applied.
+  rotation_degrees: 0
+  capture_buffer_size: 1
+  camera_controls:
+    brightness: 80
+    contrast: 50
+    saturation: 120
+    hue: 0
+    gamma: 60
+    gain: 102
+    sharpness: 130
+    backlight: 40
+    auto_exposure: 3
+    auto_white_balance: 1
+    white_balance_temperature: 4664
+    power_line_frequency: 60
+    pan: 0
+    tilt: 0
+    autofocus: 0
+
+- class: "WebCameraOpenPi"
+  device_class_id: 2
+  capture_id: ${camera.head_capture_id}
+  state_feedback:
+    fps: 30.0
+    buffer_size: 200
+    hardware_latency_ms: 0.0
+    format:
+      shape: [480, 640, 3]
+      dtype: "uint8"
+      type: rgb
+  usb_port_requirement: "any"
+  capture_fourcc: "MJPG"
+  rotation_degrees: 0
+  capture_buffer_size: 1
+  camera_controls:
+    brightness: 80
+    contrast: 50
+    saturation: 120
+    hue: 0
+    gamma: 60
+    gain: 102
+    sharpness: 130
+    backlight: 40
+    auto_exposure: 3
+    auto_white_balance: 1
+    white_balance_temperature: 4664
+    power_line_frequency: 60
+    pan: 0
+    tilt: 0
+    autofocus: 0
+
+- class: "RizonRobot"
+  device_class_id: 3
+    # Flexiv RDK connects via robot_sn (serial number, NOT IP). robot_sn order is
+    # [left, right]. Updated 2026-07-07 on 8号机 (cym, RTX 5090):
+    #   left  = Rizon 4-063087
+    #   right = Rizon 4-062071
+    # robot_sn: ["Rizon 4-063087", "Rizon 4R-062071"]
+  robot_sn: ["Rizon 4-063087", "Rizon 4R-062071"]
+    # This host is multi-NIC: robots are on the wired NIC (enp131s0, 192.168.2.0/24)
+    # but the default route is on wifi. RDK serial-number discovery must be pinned to
+    # the robot-facing NIC's local IPv4, or it searches the wrong interface and fails.
+    # The value below is deployment-specific; verify it against the host before
+    # a real-robot launch. Leave empty ([]) on single-NIC hosts.
+  network_interface_whitelist: ["192.168.2.10"]
+  state_feedback:
+    fps: 120.0
+    buffer_size: 100000
+    hardware_latency_ms: 0.0
+    format:
+      shape: [44]
+      dtype: "float64"
+        # Left arm then right arm; TCP feedback quaternions use WXYZ order.
+      type: [j1-7, dq1-7, xyz, qwqxqyqz, gripper, j1-7, dq1-7, xyz, qwqxqyqz, gripper]
+  control:
+    type: eef_abs    # joints | eef_abs | eef_rel
+    execution:
+      mode: synchronous    # synchronous | legacy_async
+      fps: 100.0
+    buffer_size: 100
+    format:
+      shape: [16]
+      dtype: "float64"
+        # Per arm: absolute TCP xyz, quaternion (XYZW), then gripper command.
+      type: [xyz, qxqyqzqw, gripper, xyz, qxqyqzqw, gripper]
+    cartesian_impedance:
+      translation_n_m: [10000.0, 10000.0, 10000.0]
+      rotation_nm_rad: [1000.0, 1000.0, 1000.0]
+  motion_limits:
+    velocity:
+      joints_rad_s:
+        left: [0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3]
+        right: [0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3]
+      tcp_linear_m_s: 0.5
+      tcp_angular_rad_s: 0.8
+    acceleration:
+      joints_rad_s2:
+        left: [2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0]
+        right: [2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0]
+      tcp_linear_m_s2: 5.0
+      tcp_angular_rad_s2: 2.0
+      # null disables the limit; otherwise [Fx, Fy, Fz, Mx, My, Mz] in N / N*m.
+    max_tcp_contact_wrench:
+    workspace:
+      enabled: false
+      frame: "robot_base"
+      min_xyz: [0.0, 0.0, 0.0]
+      max_xyz: [0.0, 0.0, 0.0]
+  signal_files: ${runtime.signal_files}
+  gripper:
+    backend: "lktech"
+    gripper_type: "soft"
+    tool_name: ""
+    name: "gripper"
+    port: ["/dev/ttyUSB1", "/dev/ttyUSB0"]
+    motor_id: [1, 1]
+    speed_dps: [1000.0, 1000.0]
+    max_vel: [0.5, 0.5]
+    auto_calibrate: [false, false]
+    home_width: [0.08, 0.08]
+      # home_width: [0.0925319933860716, 0.0925319933860716]
+    calibration_files:
+    - "calibration/lktech_gripper/LKTech-Gripper-1_2_id1_calibration.json"
+    - "calibration/lktech_gripper/LKTech-Gripper-2_2_id1_calibration.json"
+    scale_factor: [1.0, 1.0]
+    value_mode: "width_m"
+      # width_m mode sends policy output directly to the LKTech SDK in meters;
+      # normalization is handled by the policy normalizer, so device-side min/max are unused.
+    min_width:
+    max_width:
+      # TODO(remove hack): temporary 2026-06-26 inference hack; subtract this
+      # from every real-time gripper command and clip the result to 0.
+      # Left policy outputs were ~1.2 mm above the calibrated physical max
+      # during 2026-06-27 inference, causing SDK clipping warnings.
+    command_offset: [0.0, 0.0]
+      # Viewer-only model metadata. URLs are never accepted from config: the
+      # control panel maps the allowlisted `umi3` key to its vendored URDF.
+      # These identity mounts are explicit flange->gripper-base transforms and
+      # must be replaced per side if the physical adapters are not identity.
+    visual:
+      model: "umi3"
+      articulation:
+        value_mode: "width_m"
+        arm_length_m: 0.06543
+        max_width_m: 0.0925319933860716
+        apex_angle_max_deg: 90.0
+    visual_mount_transforms:
+      left:
+        frame: "flange"
+        translation: [0.0, 0.0, 0.0]
+        quaternion_wxyz: [1.0, 0.0, 0.0, 0.0]
+      right:
+        frame: "flange"
+        translation: [0.0, 0.0, 0.0]
+        quaternion_wxyz: [1.0, 0.0, 0.0, 0.0]
+  home:
+      # # giftbox-yuanhe
+      # 4号机 （双左手bug）
+      # joints_left: [1.5746041536331177, 0.7047305703163147, 0.752210259437561, 1.68265700340271, 0.42804545164108276, 2.1887295246124268, -0.8047575950622559]
+      # joints_right: [-0.3087487, 1.0843729, -0.5291836, 1.7680189, -1.9957841, 1.7840755, 2.0420352]
+    joints_left: [1.36721670627594, 1.1971391439437866, 0.8350791096687317, 1.7742716073989868, 0.47819629311561584,
+        1.3499644994735718, 0.22787520289421082]
+    joints_right: [1.2663822174072266, 1.3955061435699463, 0.6105675101280212, 1.724402904510498, 1.0657531023025513,
+        1.0845757722854614, 0.028192929923534393]
+  # Head robot disabled: the YAM head arm otherwise tracks the dual-arm center
+  # and keeps moving during inference. The policy does not use the head arm
+  # (obs = 2 wrist cams + RizonRobot_2), so it is safe to leave it out. Do NOT
+  # instead set track_robot_center=false to stop motion: that branch blocks
+  # startup waiting for a teleop head SHM that does not exist during inference.
+  # - class: "YamHeadRobot"
+  #   device_class_id: 0
+  #   # q(6) + commanded FK pose(7, xyzw) + measured FK pose(7, xyzw)
+  #   data_shape: [20]
+  #   fps: 60.0
+  #   data_dtype: "float64"
+  #   buffer_size: 100
+  #   hardware_latency_ms: 5.0
+  #   yam_channel: "can0"
+  #   yam_arm: "yam"
+  #   yam_gripper: "no_gripper"
+  #   yam_sim: false
+  #   yam_ee_site: "grasp_site"
+  #   yam_initial_q: "0,2,0.73,0.82,0,0.02"
+  #   ramp_duration_s: 5.0
+  #   home_to_zero_on_exit: true
+  #   use_publisher: true
+  #   yam_publisher_hz: 143.0
+  #   yam_publisher_vmax: null
+  #   yam_publisher_amax: 50.0
+  #   yam_max_step: 0.03
+  #   yam_ik_max_iters: 30
+  #   yam_ik_soft_pos_tol: 0.02
+  #   yam_ik_soft_ori_tol: 0.10
+  #   yam_head_filter_tau: 0.06
+  #   track_robot_center: true
+  #   robot_state_device_name: "RizonRobot"
+  #   robot_state_device_class_id: 2
+  #   robot_center_offset_xyz: [0.0, 0.0, 0.0]
+  #   yam_focus_position_xyz: [0.323, 0.0, 0.2]
+  #   yam_focus_target_noise_std_xyz: [0.01, 0.01, 0.005]
+  #   yam_focus_target_noise_tau_s: 1.5
+  #   yam_focus_target_noise_seed: null
+  #   left2world_json_path: "calibration/left2world.json"
+  #   right2world_json_path: "calibration/right2world.json"
+  #   yam2world_json_path: "calibration/yam2world.json"
+  #   yam_focus_local_forward: [0.0, 0.0, 1.0]
+  #   yam_focus_local_up: [-1.0, 0.0, 0.0]
+  #   yam_focus_world_up: [0.0, 0.0, 1.0]
+  #   yam_focus_world_y_pitch_deg: -45.0
+  #   home_command_pattern: ${runtime.signal_files.robot_home_command_pattern}
+
+  # - class: "WebCameraOpenPi"
+  #   device_class_id: 0
+  #   capture_fourcc: "MJPG"
+  #   rotation_degrees: 0
+  #   data_shape: [480, 640, 3]
+  #   fps: 30.0
+  #   data_dtype: "uint8"
+  #   buffer_size: 200
+  #   hardware_latency_ms: 0.0
+  #   capture_buffer_size: 1
+  #   camera_controls:
+  #     brightness: 80
+  #     contrast: 50
+  #     saturation: 120
+  #     hue: 0
+  #     gamma: 60
+  #     gain: 102
+  #     sharpness: 130
+  #     backlight: 40
+  #     auto_exposure: 3
+  #     auto_white_balance: 1
+  #     white_balance_temperature: 4664
+  #     power_line_frequency: 60
+  #     pan: 0
+  #     tilt: 0
+  #     autofocus: 0

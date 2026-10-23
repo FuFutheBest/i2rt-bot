@@ -1,0 +1,130 @@
+# @package _global_
+
+defaults:
+  - /devices/infer@devices: robotwin_joint14
+  - /device_manager: robotwin
+  - /action_executor: robotwin
+  - /consumer: default
+  - /runtime: default
+  - _self_
+
+device_manager:
+  device_manager:
+    # The head camera drives observation cadence; robot/cameras share the exact
+    # capture timestamp written by the bridge.
+    master_device_class_id: 1
+    params:
+      buffer_size: 300
+
+robotwin:
+  root: third_party/RoboTwin
+  task_name: beat_block_hammer
+  task_config: demo_clean
+  seed: 0
+  action_schema: joint14
+  control:
+    type: joints  # joints | eef_abs | eef_rel
+    format:
+      shape: [14]
+      dtype: float64
+      type: [j1-7, j1-7]  # Left arm then right arm joint targets.
+  physics_fps: 50.0
+  control_fps: ${policy.control_fps}
+  state_fps: 30.0
+  camera_fps: 6.0
+  enable_gui: false
+  gui_render_fps: 6.0
+  physics_sleep_spin_margin_s: 0.003
+  max_catch_up_steps: 4
+  # RoboTwin upstream defaults to ray tracing. The bridge uses SAPIEN's
+  # raster shader by default so it also runs on non-RTX simulation GPUs.
+  # Override with rt only on a ray-tracing-capable GPU.
+  renderer_shader_dir: default
+  # Keep GUI useful without retaining the heavier default Viewer targets.
+  # This is independent from policy camera rendering above.
+  viewer_shader_dir: minimal
+  # SAPIEN Viewer otherwise creates a 1920x1080 render window by default.
+  viewer_resolution: [640, 480]
+  # Upstream RoboTwin reserves 50,000 material/texture slots. The bridge only
+  # needs a single task scene, so use SAPIEN's modest defaults and leave VRAM
+  # available to the policy process.
+  renderer_max_num_materials: 128
+  renderer_max_num_textures: 512
+  joint_stiffness: 2500.0
+  joint_damping: 100.0
+  gripper_stiffness: 3000.0
+  gripper_damping: 120.0
+  # eef16 requires a pure-Numpy module:function resolver and is configured by
+  # policy_infer/robotwin/config_infer_robotwin_eef16 instead of this joint14 baseline.
+  eef_resolver: null
+  trace_log_dir: logs/action_state_xyz
+  trace_visualizer:
+    enabled: true
+    open_browser: false
+  trace_timing_interval_s: 1.0
+  # Warn when SAPIEN advances materially away from wall time.  This does not
+  # change scheduling; it makes the sim/wall assumption visible in the trace.
+  realtime_factor_warn_threshold: 0.95
+
+global_settings:
+  log_level: INFO
+  restart_on_failure: false
+  max_restart_attempts: 0
+  # DeviceManager starts only after the bridge publishes changing live frames
+  # to every virtual camera SHM. This is a failure ceiling, not a fixed delay.
+  managed_device_ready_timeout: 90.0
+  managed_device_ready_poll_interval: 0.25
+  # Allow the bridge to close SAPIEN and generate its automatic trace page
+  # before DeviceStarter escalates to SIGTERM.
+  managed_device_owner_shutdown_timeout: 45.0
+
+runtime:
+  cpu_affinity:
+    enabled: true
+    min_cpus: 32
+    profile: custom
+    custom:
+      device_starter_main: [0, 1]
+      device_manager: [2, 3]
+      visualizer: [2, 3]
+      device_default: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+      policy_runner: [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]
+      devices:
+        RoboTwinSimRobot: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+
+summary_shm: robotwin_summary_data
+
+policy:
+  class: RoboTwinReplayPolicy
+  params:
+    robot_device: RoboTwinSimRobot_0
+    action_schema: ${robotwin.action_schema}
+    # Optional [T,14] .npy/.npz(actions) fixture.  With no file, the policy
+    # holds measured qpos and exercises the async transport without motion.
+    actions_path: null
+    advance_per_prediction: 1
+    inference_delay_ms: 0.0
+  fps: 1.5
+  control_fps: 30.0
+  chunk_length: 50
+  obs:
+    devices:
+      - RoboTwinSimRobot_0
+      - RoboTwinCamera_1
+      - RoboTwinCamera_2
+      - RoboTwinCamera_3
+  controls:
+    - endpoint:
+        device: RoboTwinSimRobot
+        device_class_id: 0
+        port: command
+      shape: ${robotwin.control.format.shape}
+      dtype: ${robotwin.control.format.dtype}
+  master_device: RoboTwinCamera_1
+  infer_rollout:
+    enabled: false
+
+hydra:
+  run:
+    dir: .
+  output_subdir: null

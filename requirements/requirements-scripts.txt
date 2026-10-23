@@ -1,0 +1,39 @@
+# Dependencies for operator scripts, offline analysis, dataset conversion, and GUI helpers.
+-r requirements.txt
+
+# Plotting and dataset analysis
+matplotlib
+seaborn
+pandas
+pyarrow
+plotly
+h5py
+imageio
+imagecodecs
+numcodecs
+zarr
+
+# Camera and image utilities used by analysis/calibration scripts
+opencv-python
+qrcode
+pillow
+scikit-image
+scikit-learn
+tqdm
+transforms3d
+numba
+
+# Operator UI and terminal helpers
+rich
+py_cli_interaction
+keyboard
+dash
+
+# Upload/sync helpers
+paramiko
+
+# Pure-Python config helpers used by conversion scripts
+ruamel.yaml
+
+# GUI note: tkinter is usually bundled with Python, but may need OS-level packages
+# such as python3-tk on Linux distributions.

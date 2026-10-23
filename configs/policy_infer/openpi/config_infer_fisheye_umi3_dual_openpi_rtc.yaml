@@ -1,0 +1,147 @@
+# @package _global_
+
+# Native OpenPI RTC launch config. This file is shared by device_starter,
+# the OpenPI policy consumer, and the Control Panel.
+defaults:
+  - /devices/infer@devices: infer_rizon_fisheye_umi3_dual_openpi
+  - /device_manager: camera_sync
+  - /action_executor: base_auto_drop
+  - /consumer: default
+  - /runtime: default
+  - _self_
+
+device_manager:
+  device_manager:
+    master_device_class_id: 0
+    params:
+      buffer_size: 500
+
+shared:
+  summary_shm_name: device_summary_data
+
+metadata:
+  workflow_kind: openpi
+  policy_class: OpenPiUmiPolicy
+  hardware_required: true
+  status: available
+  supported_by:
+    - control_panel
+    - direct
+  label: OpenPI native dual-arm RTC
+
+# Physical capture nodes only; USB enumeration may change after reconnecting.
+# Logical SHM IDs live in the devices preset and never depend on these values.
+camera:
+  left_capture_id: ${oc.env:SUPERINFERENCE_CAMERA_LEFT_CAPTURE_ID,2}
+  right_capture_id: ${oc.env:SUPERINFERENCE_CAMERA_RIGHT_CAPTURE_ID,4}
+
+global_settings:
+  log_level: INFO
+  restart_on_failure: true
+  max_restart_attempts: 3
+  restart_delay: 2.0
+
+hydra:
+  run:
+    dir: .
+  output_subdir: null
+  job_logging:
+    handlers:
+      file:
+        filename: ${hydra.runtime.cwd}/logs/${hydra.job.name}.log
+
+summary_shm: device_summary_data
+
+policy:
+  class: OpenPiUmiPolicy
+  # Use the same local registry source in direct inference and Control Panel preflight.
+  openpi_src: "third_party/openpi/src"
+  params:
+    enable_rtc: true
+    # Validated contract: registry config/asset "default", state/action dim 16.
+    pi_config_name: "default"
+    ckpt_dir: /home/noematrix/openpi_ckpts_pi05/paligemma_init/gift_20260812_20260813_paligemma_hf_4053/99999
+    # prompt_from_task=True: keep this aligned with the checkpoint's training prompt.
+    task: "Put gift into box and cover lid"
+    device: "cuda"
+    obs_horizon: 1
+    num_robots: 2
+    tcp_umi_json_path: "calibration/tcp_to_umi_transform.json"  # TCP<->UMI calibration (UMI3)
+    execution_fps: ${policy.control_fps}
+  fps: 4                       # policy inference rate (low is fine)
+  control_fps: 30.0            # action executor control rate
+  chunk_length: 48             # <= model action_horizon (Pi0Config default 50)
+  obs:
+    devices:
+      - "WebCameraOpenPi_0"      # left wrist -> wrist_image_1 (order matters)
+      - "WebCameraOpenPi_1"     # right wrist -> wrist_image_2
+      - "RizonRobot_2"
+  controls:
+    - endpoint:
+        device: RizonRobot
+        device_class_id: 2
+        port: command
+      shape: [16]
+      dtype: "float64"
+
+  infer_rollout:
+    enabled: true
+    summary_shm_name: ${summary_shm}
+    output_dir: "data/rollout_data/pi05_gift_rtc"
+    save_interval: 0.001
+    start_idx: 0
+    image_size: null
+    async_write: true
+    queue_size: 50000
+    robot_type: "Rizon"
+    task: ${policy.params.task}
+    ready_timeout: 10.0
+    auto_start: false
+    anomaly_config_path: "configs/anomaly_config/rizon_fisheye_umi3.yaml"
+    policy_outputs:
+      value:
+        name: "policy_value_estimation"
+        device_type: "PolicyValue"
+        buffer_size: 100
+        dtype: "float64"
+        enabled: false
+      q_value:
+        name: "policy_q_value_estimation"
+        device_type: "PolicyQValue"
+        buffer_size: 100
+        dtype: "float64"
+        enabled: false
+      q_value_timestamps:
+        name: "policy_q_value_timestamps"
+        device_type: "PolicyQValueTimestamps"
+        buffer_size: 100
+        dtype: "int64"
+        enabled: false
+      action_chunk:
+        name: "action_chunk"
+        device_type: "ActionChunk"
+        buffer_size: 200
+        dtype: "float64"
+        enabled: true
+    control_shms: ${policy.controls}
+    episode_control:
+      enabled: true
+      success_key: "s"
+      failure_key: "f"
+      discard_key: "d"
+      auto_restart: true
+      home_wait_time: 5.0
+
+  observation_recorder:
+    enabled: true
+    output_dir: logs/offline_observations/openpi_rtc
+    fps: 30.0
+    queue_size: 512
+    compress: false
+    superoffline_reviewed_source_profile: rizon-umi3-fisheye-openpi-rgb.v2
+    calibration_files:
+      tcp_to_umi: ${policy.params.tcp_umi_json_path}
+      left_base_to_world: calibration/left_base_to_world.json
+      right_base_to_world: calibration/right_base_to_world.json
+      left_gripper: configs/devices/calibration/lktech_gripper/LKTech-Gripper-1_2_id1_calibration.json
+      right_gripper: configs/devices/calibration/lktech_gripper/LKTech-Gripper-2_2_id1_calibration.json

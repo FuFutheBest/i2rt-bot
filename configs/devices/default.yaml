@@ -1,0 +1,70 @@
+devices:
+  - class: BaseDevice
+    device_class_id: 0
+    state_feedback:
+      fps: 1000.0
+      buffer_size: 1000
+      hardware_latency_ms: 1.0
+      format:
+        shape: [7]
+        dtype: float64
+        type: [linear:7]  # Generic seven-scalar example stream.
+
+  - class: BaseDevice
+    device_class_id: 1
+    state_feedback:
+      fps: 1000.0
+      buffer_size: 5000
+      hardware_latency_ms: 1.0
+      format:
+        shape: [7]
+        dtype: float32
+        type: [linear:7]  # Generic seven-scalar example stream.
+
+
+  - class: JointSlider
+    device_class_id: 2
+    state_feedback:
+      fps: 10.0
+      buffer_size: 100
+      hardware_latency_ms: 0.0
+      format:
+        shape: [7]
+        dtype: float64
+        type: [j1-7]
+    num_joints: 7
+    joint_ranges:
+      - [-3.14, 3.14]
+      - [-3.14, 3.14]
+      - [-3.14, 3.14]
+      - [-3.14, 3.14]
+      - [-3.14, 3.14]
+      - [-3.14, 3.14]
+      - [-3.14, 3.14]
+
+  - class: SimRobot
+    device_class_id: 3
+    state_feedback:
+      fps: 100.0
+      buffer_size: 100
+      hardware_latency_ms: 10.0
+      format:
+        shape: [14]
+        dtype: float64
+        type: [j1-7, dq1-7]
+    control:
+      type: joints  # joints | eef_abs | eef_rel
+      source_selection:
+        mode: single_source
+        source:
+          device: JointSlider
+          device_class_id: 2
+          port: state
+      buffer_size: 100
+      format:
+        shape: [7]
+        dtype: float64
+        type: [j1-7]
+    urdf_path: null
+    joint_indices: null
+    enable_gui: true

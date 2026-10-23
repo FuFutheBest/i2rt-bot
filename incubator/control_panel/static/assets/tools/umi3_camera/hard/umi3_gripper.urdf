@@ -1,0 +1,35 @@
+<?xml version="1.0"?>
+<robot name="umi3_camera_hard_finger">
+  <material name="body_dark"><color rgba="0.16 0.18 0.21 1.0"/></material>
+  <material name="finger_hard"><color rgba="0.03 0.52 0.58 1.0"/></material>
+  <link name="base_link">
+    <inertial>
+      <origin xyz="0 0 0.09" rpy="0 0 0"/>
+      <mass value="1.0"/>
+      <inertia ixx="0.003" ixy="0" ixz="0" iyy="0.003" iyz="0" izz="0.001"/>
+    </inertial>
+    <visual>
+      <geometry><mesh filename="meshes/base_link.stl" scale="0.001 0.001 0.001"/></geometry>
+      <material name="body_dark"/>
+    </visual>
+  </link>
+  <link name="index_finger_link">
+    <inertial>
+      <origin xyz="-0.03 0 0.02" rpy="0 0 0"/>
+      <mass value="0.12"/>
+      <inertia ixx="0.00006" ixy="0" ixz="0" iyy="0.00010" iyz="0" izz="0.00008"/>
+    </inertial>
+    <visual>
+      <geometry><mesh filename="meshes/index_link.stl" scale="0.001 0.001 0.001"/></geometry>
+      <material name="finger_hard"/>
+    </visual>
+  </link>
+  <joint name="gripper_joint" type="revolute">
+    <origin xyz="-0.021210000 0 0.130500000" rpy="0 1.321776437036 0"/>
+    <parent link="base_link"/>
+    <child link="index_finger_link"/>
+    <axis xyz="0 -1 0"/>
+    <limit lower="0.0" upper="1.570796326795" effort="100.0" velocity="1.5"/>
+    <dynamics damping="0.05" friction="0.02"/>
+  </joint>
+</robot>

@@ -1,0 +1,64 @@
+enable_visualizers: false
+enable_device_manager: true
+# Global default for camera overlay image blending
+# Can be overridden per device in device config with enable_overlay: true/false
+camera_overlay_enabled: false
+
+# Signal file patterns for multiprocessing communication
+# These files are used for coordination between device_starter, consumers, devices, and policy_runner
+signal_files:
+  reset_signal: "/tmp/superinference_reset_signal"
+  robot_home_index: "/tmp/superinference_robot_home_index"
+  episode_signal_pattern: "/tmp/superinference_episode_{signal}"
+  robot_home_command_pattern: "/tmp/superinference_robot_{device_name}_{device_class_id}_home_command"
+  robot_teleop_start_command_pattern: "/tmp/superinference_robot_{device_name}_{device_class_id}_teleop_start_command"
+  robot_teleop_discard_command_pattern: "/tmp/superinference_robot_{device_name}_{device_class_id}_teleop_discard_command"
+  start_recording: "/tmp/superinference_start_recording"
+  stop_recording: "/tmp/superinference_stop_recording"
+  episode_result: "/tmp/superinference_episode_result"
+  policy_runner_reset_command: "/tmp/superinference_policy_runner_reset_command"
+  teleoperator_reset_command: "/tmp/superinference_teleoperator_reset_command"
+  rollout_ready: "/tmp/superinference_rollout_ready"
+  robot_reconnect: "/tmp/superinference_robot_reconnect"
+  robot_halt_command_pattern: "/tmp/superinference_robot_{device_name}_{device_class_id}_halt_command"
+  robot_halt_reply_pattern: "/tmp/superinference_robot_{device_name}_{device_class_id}_halt_reply"
+
+# CPU affinity tuned for a 24-core Intel Core Ultra 9 285K (Arrow Lake, no HT):
+#   P-cores: cpu 0-7   (~4.0-4.6 GHz, low-jitter / real-time work)
+#   E-cores: cpu 8-23  (~3.3 GHz, throughput / parallel work)
+# (P/E split is authoritative from /sys/devices/cpu_core vs cpu_atom.)
+#
+# Same philosophy as r1_cpu_20core.yaml: control loops on P-cores, throughput work
+# (cameras / ZED / VP8 encode) on dedicated, non-overlapping E-core blocks. The
+# default `auto` preset (_PRESET_12CPU) instead crams ALL devices onto cores
+# [0-4] (its per-device keys are RizonRobot/HikCameraDevice, which don't match
+# the R1 classes) and hands VP8 only the leftover cores. This profile fixes both.
+#
+# Layout (8 P-cores 0-7 + 16 E-cores 8-23, no overlap on the heavy consumers):
+#   P0       device_starter_main + device_manager (orchestration, light)
+#   P1       policy_runner / visualizer (idle during pure data collection)
+#   P2,3     device_default + Quest3 vuer server (teleop, light)
+#   P4,5,6   Flexiv dual-arm control (120 Hz, low jitter)
+#   P7       YAM head arm control
+#   E8,9,10  3 USB cameras (1 core each; VGA@30 MJPG decode is light)
+#   E11,12   ZED stereo capture + color convert
+#   E13-23   VP8 encode (11 E-cores) -- this box has E-cores to spare
+# NOTE: per-device keys must match the EXACT device class name, e.g.
+#   `RizonRobotLKForceGated` (not `RizonRobot`), or it falls back to device_default.
+cpu_affinity:
+  enabled: true
+  min_cpus: 8
+  profile: custom
+  custom:
+    device_starter_main: [0]
+    device_manager: [0]
+    policy_runner: [1]
+    visualizer: [1]
+    device_default: [2, 3]
+    zed_webrtc: [13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]   # 11 E-cores for VP8 encode
+    devices:
+      RizonRobotLKForceGated: [4, 5, 6]     # P-cores, real-time control
+      YamHeadRobot: [7]                      # P-core, real-time control
+      WebCameraDevice: [8, 9, 10]            # E-cores, 3 USB cameras (1 each)
+      ZedStereoDevice: [11, 12]              # E-cores, ZED capture
+      Quest3VuerTeleoperator: [2, 3]         # lightweight, shares with default

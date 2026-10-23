@@ -1,0 +1,3 @@
+interface:
+  display_name: "Superinference Operator"
+  short_description: "Route safe SuperInference robot and runtime operations"

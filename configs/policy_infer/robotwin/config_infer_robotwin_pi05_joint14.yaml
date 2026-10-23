@@ -1,0 +1,47 @@
+# @package _global_
+
+defaults:
+  - /policy_infer/robotwin/config_infer_robotwin_replay_joint14
+  - _self_
+
+robotwin:
+  xpolicylab_root: third_party/RoboTwin/XPolicyLab
+  xpolicylab_server:
+    enabled: ${oc.env:ROBOTWIN_XPL_SERVER_ENABLED,false}
+    policy_name: Pi_05
+    host: ${oc.env:ROBOTWIN_XPL_HOST,127.0.0.1}
+    port: ${oc.env:ROBOTWIN_PI05_PORT,6000}
+    bench_name: RoboTwin
+    task_name: ${robotwin.task_name}
+    ckpt_name: ${oc.env:ROBOTWIN_PI05_CKPT,lerobot_v30}
+    env_cfg_type: aloha_agilex
+    action_type: joint
+    seed: ${robotwin.seed}
+    policy_gpu_id: ${oc.env:ROBOTWIN_PI05_GPU,0}
+    # A bound policy-server runtime profile supplies the uv project path.
+    # ROBOTWIN_PI05_UV_ENV remains an explicit compatibility override.
+    runtime_env: ${oc.env:ROBOTWIN_PI05_UV_ENV,not_configured}
+
+policy:
+  class: RoboTwinXPolicyLabPolicy
+  params:
+    policy_name: Pi_05
+    xpolicylab_root: ${robotwin.xpolicylab_root}
+    host: ${robotwin.xpolicylab_server.host}
+    port: ${robotwin.xpolicylab_server.port}
+    robot_device: RoboTwinSimRobot_0
+    camera_devices:
+      head_camera: RoboTwinCamera_0
+      left_camera: RoboTwinCamera_1
+      right_camera: RoboTwinCamera_2
+    task_name: ${robotwin.task_name}
+    task_config: ${robotwin.task_config}
+    env_cfg_type: ${robotwin.xpolicylab_server.env_cfg_type}
+    action_type: ${robotwin.xpolicylab_server.action_type}
+    seed: ${robotwin.seed}
+    instruction: "${oc.env:ROBOTWIN_INSTRUCTION,beat block with the hammer}"
+    frequency: ${policy.control_fps}
+    request_timeout_s: 300.0
+  fps: 2.0
+  control_fps: 15.0
+  chunk_length: 50

@@ -1,0 +1,48 @@
+devices:
+- class: "I2RTBimanualTeleop"
+  device_class_id: 0
+  device_name: "I2RTRobot"
+  follower_device_class_id: 1
+  teleoperation_config_path: ${oc.env:SI_I2RT_TELEOP_CONFIG_PATH,configs/i2rt_bimanual_teleop.yaml}
+  enable_visualizer: false
+  state_feedback: &i2rt_state_feedback
+    fps: 100.0
+    buffer_size: 5000
+    hardware_latency_ms: 0.0
+    format:
+      shape: [14]
+      dtype: "float64"
+      type: [j1-7, j1-7]
+  follower_state_feedback: *i2rt_state_feedback
+
+# The owner above publishes this second stream. DeviceStarter uses this entry
+# for readiness checks and does not launch another robot process.
+- class: "I2RTBimanualTeleop"
+  device_class_id: 1
+  device_name: "I2RTRobot"
+  state_feedback: *i2rt_state_feedback
+  managed_by: "I2RTBimanualTeleop_0"
+
+- class: "WebCameraDevice"
+  device_class_id: 2
+  state_feedback:
+    fps: 30.0
+    buffer_size: 200
+    hardware_latency_ms: 33.0
+    format:
+      shape: [360, 640, 3]
+      dtype: "uint8"
+      type: rgb
+  capture_id: ${camera.left_capture}
+
+- class: "WebCameraDevice"
+  device_class_id: 3
+  state_feedback:
+    fps: 30.0
+    buffer_size: 200
+    hardware_latency_ms: 33.0
+    format:
+      shape: [360, 640, 3]
+      dtype: "uint8"
+      type: rgb
+  capture_id: ${camera.right_capture}

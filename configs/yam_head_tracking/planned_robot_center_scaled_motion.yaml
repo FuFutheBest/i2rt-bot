@@ -1,0 +1,22 @@
+# YamHead strategy: preview planned center with visible but bounded head translation.
+type: planned_robot_center_scaled_motion
+control_endpoint:
+  device: RizonRobot
+  device_class_id: 2
+  port: command
+control_dtype: "float64"
+translation_scale: 0.5
+max_translation_m: 0.16
+track_robot_center: true
+robot_state_device_name: "RizonRobot"
+robot_state_device_class_id: 2
+robot_center_offset_xyz: [0.0, 0.0, 0.0]
+yam_focus_position_xyz: [0.323, 0.0, 0.2]
+yam_focus_target_noise_std_xyz: [0.01, 0.01, 0.005]
+yam_focus_target_noise_tau_s: 1.5
+yam_focus_target_noise_seed: null
+yam_head_filter_tau: 0.06
+yam_focus_local_forward: [0.0, 0.0, 1.0]
+yam_focus_local_up: [-1.0, 0.0, 0.0]
+yam_focus_world_up: [0.0, 0.0, 1.0]
+yam_focus_world_y_pitch_deg: -45.0

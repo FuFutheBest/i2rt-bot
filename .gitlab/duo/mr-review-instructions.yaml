@@ -1,0 +1,107 @@
+# Project-specific guidance for GitLab Duo Code Review.
+# It also applies to Code Review Flow after that feature is available. This file
+# guides AI review comments; it is not a CI gate or an approval rule.
+
+instructions:
+  - name: "SuperInference review behavior"
+    fileFilters:
+      - "**/*"
+      - "!.gitlab/duo/**/*"
+    instructions: |
+      Use the repository checklist at
+      .claude/skills/superinference-ci/references/review-checklist.md
+      as supporting context and apply only the sections relevant to the diff.
+
+      Report only concrete, actionable findings caused or exposed by the change.
+      For each finding, identify the file and line, explain the impact, assign a
+      severity (blocker, high, medium, or low), and give the smallest practical
+      fix. Do not report a checklist item merely because it is not applicable.
+      Do not claim that a test or hardware check ran without evidence in the MR
+      or pipeline. When relevant, check that the MR explains its purpose,
+      affected owner, test command and result, risk, rollback, and deferred
+      decisions. Treat the review as advisory and leave final approval to a
+      human reviewer.
+
+  - name: "Core compatibility and dependency boundaries"
+    fileFilters:
+      - "consumer/**/*.py"
+      - "devices/**/*.py"
+      - "manager/**/*.py"
+      - "policy/**/*.py"
+      - "utils/**/*.py"
+      - "configs/**/*"
+      - "device_starter.py"
+      - "windows_device_start.py"
+      - "requirements*.txt"
+    instructions: |
+      1. Check public import paths, facade exports, config keys, registry names,
+         and CLI behavior for unintended breaking changes. Flag a break only
+         when the diff lacks a migration or compatibility explanation.
+      2. Check that hardware, vendor, CUDA, checkpoint, and model imports remain
+         lazy and belong to the correct dependency profile. Core code must not
+         introduce a dependency on incubator modules.
+      3. Review reset, cleanup, reconnect, halt, home, and exception paths for
+         stale state, unsafe ordering, or non-idempotent behavior.
+
+  - name: "SHM action and trace contracts"
+    fileFilters:
+      - "utils/contracts.py"
+      - "utils/shm_utils.py"
+      - "consumer/**/*.py"
+      - "manager/**/*.py"
+      - "tests/utils/**/*.py"
+      - "tests/consumer/**/*.py"
+      - "tests/manager/**/*.py"
+      - "tests/test_action_executor_aligned_chunk_logging.py"
+      - "tests/test_chunk_manager_auto_drop.py"
+      - "tests/test_smooth_chunk_manager.py"
+      - "tests/test_rollout_trace_logger_contracts.py"
+    instructions: |
+      1. For shared-memory, action, or trace changes, check dtype, shape, units,
+         timestamp domain and meaning, serialization, and version compatibility.
+      2. Check action-chunk alignment, drop/smoothing behavior, execution rates,
+         and original action indices across producer and consumer code.
+      3. Flag floating-point timestamp matching or implicit timestamp
+         reinterpretation in diagnostics and recording paths.
+      4. Check that focused contract tests cover changed behavior and that the MR
+         records the relevant test command and result.
+
+  - name: "Hardware and external integration safety"
+    fileFilters:
+      - "devices/cameras/**/*.py"
+      - "devices/robots/**/*.py"
+      - "incubator/**/*.py"
+      - "scripts/benchmark/**/*.py"
+      - "scripts/legacy/**/*.py"
+      - "third_party/**/*"
+      - ".gitmodules"
+    instructions: |
+      1. Keep vendor and hardware imports lazy so core imports remain usable
+         without the target workstation SDK.
+      2. Distinguish an import-contract test from real hardware validation. For
+         hardware-facing changes, check that the MR identifies the required
+         operator evidence for camera timing, calibration, robot/gripper
+         home/reset/halt, and emergency-stop behavior.
+      3. Check that credentials, IP addresses, device names, certificates, and
+         host-specific paths are not hard-coded.
+      4. For third-party or submodule changes, check URL/pin scope and the
+         separate dependency and runner boundary.
+
+  - name: "Verification and handoff evidence"
+    fileFilters:
+      - "tests/**/*.py"
+      - "scripts/**/*.py"
+      - "docs/**/*.md"
+      - ".claude/**/*.md"
+      - ".gitlab-ci.yml"
+      - ".gitlab/merge_request_templates/**/*.md"
+    instructions: |
+      1. Check that changed behavior has relevant tests or that the MR explains
+         why a test is not applicable.
+      2. Check changed entrypoints for a safe --help or --dry-run path that does
+         not start a robot, camera, policy server, or other hardware process.
+      3. Check that dependency, configuration, migration, rollback, and user
+         documentation changes are recorded when the diff requires them.
+      4. Interpret root CI, model, panel, hardware, and third-party results
+         according to their separate environment boundaries; do not treat an
+         allowed-failure optional job as equivalent to the blocking root gate.

@@ -1,0 +1,27 @@
+# Dependencies for policy adapters and policy serving clients.
+-r requirements.txt
+
+# Networked policy serving and message serialization. FastWAM uses the modern
+# asyncio/server and sync-client APIs introduced in websockets 13.0.
+websockets>=13
+msgpack
+websocket-client
+
+# Shared local-policy helpers
+einops
+dill
+imageio
+opencv-python
+scikit-image
+transforms3d
+
+# PyTorch wheels are CUDA/CPU specific and intentionally excluded. Install the
+# matching torch/torchvision pair before running LingBotVA or FastWAM.
+# torch
+# torchvision
+
+# OpenPI is installed from its maintained project metadata, not duplicated
+# here: ``uv pip install -e third_party/openpi``. LingBotVA/FastWAM use the
+# version-sensitive stack in ``third_party/nmx_vla/requirements.txt`` and
+# should use a separate model environment when its Transformers pin conflicts
+# with OpenPI.

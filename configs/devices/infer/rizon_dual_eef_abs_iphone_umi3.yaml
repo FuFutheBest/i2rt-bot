@@ -1,0 +1,112 @@
+# Rizon dual-arm EEF absolute control with iPhone UMI3 wrists.
+
+devices:
+- class: "IPhoneCameraDevice"
+  device_class_id: 0
+  capture_id: ${camera.left_capture_id}
+  state_feedback:
+    fps: 30.0
+    buffer_size: 200
+    hardware_latency_ms: 200.0
+    format:
+      shape: [640, 480, 3]
+      dtype: "uint8"
+      type: rgb
+  rotation_degree: 90   # clockwise
+- class: "IPhoneCameraDevice"
+  device_class_id: 1
+  capture_id: ${camera.right_capture_id}
+  state_feedback:
+    fps: 30.0
+    buffer_size: 200
+    hardware_latency_ms: 200.0
+    format:
+      shape: [480, 640, 3]
+      dtype: "uint8"
+      type: rgb
+  rotation_degree: 0
+- class: "RizonRobot"
+  device_class_id: 2
+    # Flexiv SDK currently connects via robot_sn; IPs are documented here for reference:
+    # left: 192.168.1.100
+    # right: 192.168.1.101
+  robot_sn: ["Rizon 4-063256", "Rizon 4R-062088"]
+  state_feedback:
+    fps: 120.0
+    buffer_size: 100000
+    hardware_latency_ms: 0.0
+    format:
+      shape: [44]
+      dtype: "float64"
+        # Flattened order: left arm, then right arm. Each arm publishes joint
+        # position, joint velocity, TCP xyz, TCP quaternion (WXYZ), and gripper.
+      type: [j1-7, dq1-7, xyz, qwqxqyqz, gripper, j1-7, dq1-7, xyz, qwqxqyqz, gripper]
+  control:
+    type: eef_abs    # joints | eef_abs | eef_rel
+    execution:
+      mode: synchronous    # synchronous | legacy_async
+      fps: 100.0
+    buffer_size: 100
+    format:
+      shape: [16]
+      dtype: "float64"
+        # Per arm: absolute TCP xyz, TCP quaternion (XYZW), then gripper command.
+      type: [xyz, qxqyqzqw, gripper, xyz, qxqyqzqw, gripper]
+    cartesian_impedance:
+      translation_n_m: [10000.0, 10000.0, 10000.0]
+      rotation_nm_rad: [1000.0, 1000.0, 1000.0]
+  motion_limits:
+    velocity:
+      joints_rad_s:
+        left: [0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3]
+        right: [0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3]
+      tcp_linear_m_s: 0.5
+      tcp_angular_rad_s: 0.8
+    acceleration:
+      joints_rad_s2:
+        left: [2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0]
+        right: [2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0]
+      tcp_linear_m_s2: 5.0
+      tcp_angular_rad_s2: 2.0
+      # null disables the limit; otherwise [Fx, Fy, Fz, Mx, My, Mz] in N / N*m.
+    max_tcp_contact_wrench:
+    workspace:
+      enabled: false
+      frame: "robot_base"
+      min_xyz: [0.0, 0.0, 0.0]
+      max_xyz: [0.0, 0.0, 0.0]
+  signal_files: ${runtime.signal_files}
+  gripper:
+    backend: "lktech"
+    gripper_type: "soft"
+    tool_name: "umi3_tcp"
+    name: "gripper"
+    port: ["/dev/ttyUSB1", "/dev/ttyUSB0"]
+    motor_id: [1, 1]
+    speed_dps: [1000.0, 1000.0]
+    max_vel: [0.5, 0.5]
+    auto_calibrate: [false, false]
+    home_width: [0.0925319933860716, 0.0925319933860716]
+    calibration_files:
+    - "calibration/lktech_gripper/LKTech-Gripper-1_2_id1_calibration.json"
+    - "calibration/lktech_gripper/LKTech-Gripper-2_2_id1_calibration.json"
+    scale_factor: [1.0, 1.0]
+    value_mode: "width_m"
+      # width_m mode sends policy output directly to the LKTech SDK in meters;
+      # max_width clips policy commands before they reach the LKTech SDK.
+    min_width:
+    max_width: [0.0925319933860716, 0.0925319933860716]
+  home:
+      # joints_left: [1.1455864906311035, 1.0029877424240112, 0.5467976927757263, 1.503884196281433, 0.294296532869339, 1.2310147285461426, -0.19914610683918]
+      # joints_right: [0.8410581350326538, 1.3362149000167847, 0.19707462191581726, 1.5401957035064697, 1.15559720993042, 0.5278409123420715, -0.15138262510299683]
+      # joints_left: [1.1908020973205566, 1.1872187852859497, 0.564819872379303, 1.731413722038269, 0.7790786027908325, 1.2574501037597656, 0.00012122193584218621]
+      # joints_right: [0.8537163734436035, 1.3377903699874878, 0.19599977135658264, 1.551578402519226, 1.140787959098816, 0.5383116602897644, -0.1525575816631317]
+      # joints_left: [1.1345593929290771, 0.8400377035140991, 0.5663706660270691, 1.4887701272964478, 0.34371593594551086, 1.2641175985336304, -0.010877675376832485]
+      # joints_right: [0.8481072783470154, 1.339891791343689, 0.1895667165517807, 1.5523300170898438, 1.1505627632141113, 0.5300068855285645, -0.15672197937965393]
+    joints_left: [1.281982660293579, 1.0759217739105225, 0.46355924010276794, 1.7208454608917236, 0.37141865491867065,
+        1.2569096088409424, -0.013397416099905968]
+    joints_right: [0.8477580547332764, 1.3796947002410889, 0.16860076785087585, 1.5882889032363892, 1.0547701120376587,
+        0.9069119095802307, -0.20854942500591278]
+      ########## towels ##########
+      # joints_left: [1.7806427478790283, 0.8060516715049744, 0.5677345991134644, 1.6071038246154785, 0.14200133085250854, 1.8361557722091675, -0.008588796481490135]
+      # joints_right: [1.5480717420578003, 1.051060438156128, 0.510292112827301, 1.5751686096191406, 0.6432283520698547, 1.5644270181655884, -0.12026563286781311]

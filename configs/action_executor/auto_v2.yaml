@@ -1,0 +1,14 @@
+action_executor:
+  type: base_policy_runner
+  robot_control_shms: ${policy.controls}
+  execution_fps: ${policy.control_fps}
+  chunk_length: ${policy.chunk_length}
+  signal_files: ${runtime.signal_files}
+  chunk_manager:
+    type: auto_manager_v2
+    search_tolerance: 4
+    pos_weight: 0.4
+    rot_weight: 0.1
+    ee_weight: 0.01
+    discount_factor: 0.98
+    direction_consistency_range: 4

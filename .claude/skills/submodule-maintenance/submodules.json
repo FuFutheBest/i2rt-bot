@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "submodules": [
+    {
+      "name": "openpi",
+      "path": "third_party/openpi",
+      "remote": "git@gitlab.noematrix.cn:noematrix/pre-training/openpi.git",
+      "branch": "main",
+      "enabled": true
+    },
+    {
+      "name": "i2rt",
+      "path": "third_party/i2rt",
+      "remote": "git@gitlab.noematrix.cn:noematrix/pre-training/i2rt.git",
+      "branch": "fix/passive-encoder-wrap",
+      "enabled": true
+    },
+    {
+      "name": "lktech-motor-sdk",
+      "path": "third_party/lktech_motor_sdk",
+      "remote": "git@gitlab.noematrix.cn:noematrix/pre-training/lktech_motor_sdk.git",
+      "branch": "main",
+      "enabled": true
+    },
+    {
+      "name": "nmx-vla",
+      "path": "third_party/nmx_vla",
+      "remote": "git@gitlab.noematrix.cn:noematrix/pre-training/nmx_vla.git",
+      "branch": "junlin/fasterwam-inference",
+      "enabled": true
+    },
+    {
+      "name": "robotwin",
+      "path": "third_party/RoboTwin",
+      "remote": "git@gitlab.noematrix.cn:noematrix/pre-training/RoboTwin.git",
+      "branch": "superinference",
+      "enabled": true
+    }
+  ]
+}

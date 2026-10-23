@@ -1,0 +1,550 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="gripper-permission-csrf" content="{{ gripper_permission_csrf | e }}">
+  <meta name="gripper-password-transport" content="{{ 'allowed' if gripper_permission_password_allowed else 'blocked' }}">
+  <title>SuperInference 设备控制台</title>
+  <link rel="stylesheet" href="/static/device_control.css?v=20260902-control-panel-save-v2">
+  <script defer src="/static/device_control.js?v=20260902-control-panel-save-v2"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">跳到主要内容</a>
+
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand-block">
+        <div class="brand-mark" aria-hidden="true">SI</div>
+        <div>
+          <h1>SuperInference</h1>
+          <p>共享内存设备控制台</p>
+        </div>
+      </div>
+
+      <div class="topbar-actions">
+        <button
+          class="button button--danger force-stop-button topbar-force-stop-button"
+          id="force-stop-all"
+          type="button"
+          aria-describedby="force-stop-hint"
+          disabled
+        >
+          <span class="topbar-force-stop-button__icon" aria-hidden="true">&#9632;</span>
+          <span class="topbar-force-stop-button__label">强制关闭所有进程</span>
+        </button>
+        <span class="sr-only" id="force-stop-hint">
+          仅强制关闭控制面板拥有的子进程；不会复位、优雅 Disable 或完成录制保存。
+        </span>
+        <a
+          class="topbar-nav-button"
+          id="recordings-navigation"
+          href="/recordings"
+          title="打开录制数据回放"
+        >
+          <span class="topbar-nav-button__icon" aria-hidden="true">&#9654;</span>
+          <span class="topbar-nav-button__label">录制回放</span>
+        </a>
+        <div class="server-state" id="server-state" role="status" aria-live="polite">
+          <span class="status-dot status-dot--pending" id="server-state-dot" aria-hidden="true"></span>
+          <span id="server-state-text">正在连接</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="workspace-layout" id="main-content">
+      <aside class="control-rail" aria-label="配置与设备控制">
+        <section class="config-panel panel" aria-labelledby="config-heading">
+          <div class="config-copy">
+            <p class="eyebrow" id="config-heading">运行配置</p>
+            <p class="config-caption" id="config-caption">选择 configs 顶层配置。</p>
+          </div>
+
+          <div class="config-controls">
+            <label class="sr-only" for="config-select">选择配置</label>
+            <select id="config-select" disabled>
+              <option value="">正在读取配置…</option>
+            </select>
+          </div>
+
+          <p class="config-detail" id="config-detail" aria-live="polite"></p>
+
+          <section class="checkpoint-control" aria-labelledby="checkpoint-control-heading">
+            <div class="checkpoint-control__heading">
+              <p class="eyebrow" id="checkpoint-control-heading">临时 Checkpoint</p>
+              <span class="checkpoint-source-badge" id="checkpoint-source-badge" data-source="default">默认</span>
+            </div>
+            <dl class="checkpoint-paths">
+              <div>
+                <dt>默认</dt>
+                <dd id="checkpoint-default-path" title="">—</dd>
+              </div>
+              <div>
+                <dt>临时</dt>
+                <dd id="checkpoint-override-path" title="">未设置</dd>
+              </div>
+              <div>
+                <dt>本次生效</dt>
+                <dd id="checkpoint-effective-path" title="">—</dd>
+              </div>
+            </dl>
+            <div class="checkpoint-actions">
+              <button class="button button--secondary button--small" id="checkpoint-browse-button" type="button" disabled>
+                选择 checkpoint
+              </button>
+              <button class="button button--secondary button--small" id="checkpoint-clear-button" type="button" disabled>
+                清除 override
+              </button>
+            </div>
+            <p class="checkpoint-status" id="checkpoint-status" role="status" aria-live="polite">请先选择运行配置。</p>
+            <div class="inference-option-row">
+              <div class="inference-option-copy">
+                <strong>空壳推理测试</strong>
+                <span id="test-inference-status">保持双臂 TCP，仅同步往返开合夹爪</span>
+              </div>
+              <button class="panel-device-toggle inference-option-toggle" id="test-inference-toggle" type="button" role="switch" aria-checked="false" disabled>
+                未开启
+              </button>
+            </div>
+          </section>
+        </section>
+
+        <div class="notice notice--error" id="global-notice" role="alert" hidden></div>
+
+        <section class="summary-grid" aria-label="系统摘要">
+          <div class="summary-card">
+            <span>配置</span>
+            <strong id="metric-configured">—</strong>
+          </div>
+          <div class="summary-card">
+            <span>运行</span>
+            <strong id="metric-running">—</strong>
+          </div>
+          <div class="summary-card">
+            <span>SHM</span>
+            <strong id="metric-healthy">—</strong>
+          </div>
+          <div class="summary-card summary-card--alert">
+            <span>异常</span>
+            <strong id="metric-errors">—</strong>
+          </div>
+        </section>
+
+        <section class="panel workflow-panel" aria-labelledby="workflow-heading">
+          <div class="workflow-heading">
+            <div>
+              <p class="eyebrow">执行链路</p>
+              <h2 id="workflow-heading">运行与推理</h2>
+            </div>
+            <span class="workflow-profile" id="workflow-profile">device / openpi</span>
+          </div>
+          <div class="workflow-control">
+            <button class="button workflow-button" id="runtime-toggle" type="button" disabled>
+              启动运行时
+            </button>
+            <p class="workflow-status" id="runtime-status">等待所有设备就绪</p>
+          </div>
+          <div class="workflow-control" id="server-control" hidden>
+            <button class="button workflow-button" id="server-toggle" type="button" disabled>
+              启动模型 Server
+            </button>
+            <p class="workflow-status" id="server-status">等待加载 FastWAM 模型</p>
+          </div>
+          <div class="workflow-control">
+            <button class="button workflow-button" id="inference-toggle" type="button" disabled>
+              开始推理
+            </button>
+            <p class="workflow-status" id="inference-status">请先启动运行时</p>
+          </div>
+          <div class="recording-actions" aria-labelledby="recording-actions-heading">
+            <div class="recording-actions__heading">
+              <p class="eyebrow" id="recording-actions-heading">推理录制</p>
+              <span class="recording-actions__state" id="recording-action-status">等待推理</span>
+            </div>
+            <div class="inference-option-row inference-option-row--recording">
+              <div class="inference-option-copy">
+                <strong>Rollout 录制</strong>
+                <span>使用控制面板固定录制参数</span>
+              </div>
+              <button class="panel-device-toggle inference-option-toggle" id="rollout-toggle" type="button" role="switch" aria-checked="false" disabled>
+                未开启
+              </button>
+            </div>
+            <div class="rollout-path-control">
+              <span>保存根目录</span>
+              <code id="rollout-output-path" title="">未选择</code>
+              <button class="button button--secondary button--small" id="rollout-path-button" type="button" disabled>选择目录</button>
+            </div>
+            <div class="rollout-storage-budget" id="rollout-storage-budget" data-status="unavailable" role="status" aria-live="polite" hidden>
+              <div class="rollout-storage-budget__heading">
+                <strong id="rollout-storage-title">存储空间检测中</strong>
+                <span class="rollout-storage-budget__badge" id="rollout-storage-badge">检测中</span>
+              </div>
+              <div class="rollout-storage-budget__metrics">
+                <span>可用 <b id="rollout-storage-free">—</b></span>
+                <span>预计可录 <b id="rollout-storage-remaining">—</b></span>
+              </div>
+              <div class="rollout-storage-budget__bar" aria-hidden="true">
+                <span id="rollout-storage-bar"></span>
+              </div>
+              <p id="rollout-storage-detail">正在读取保存盘容量。</p>
+            </div>
+            <div class="recording-action-grid" id="recording-action-grid">
+              <div class="recording-action-row" aria-label="整段录制操作">
+                <button class="button recording-action-button recording-action-button--accept" id="recording-episode-accept" data-recording-action="episode_accept" type="button" aria-describedby="recording-action-hint" disabled>
+                  <span>接受并复位</span><kbd class="recording-action-key" data-recording-shortcut-label aria-hidden="true"></kbd>
+                </button>
+                <button class="button recording-action-button recording-action-button--discard" id="recording-episode-discard" data-recording-action="episode_discard" type="button" aria-describedby="recording-action-hint" disabled>
+                  <span>拒绝并复位</span><kbd class="recording-action-key" data-recording-shortcut-label aria-hidden="true"></kbd>
+                </button>
+              </div>
+              <div class="recording-action-row" aria-label="片段录制标记">
+                <button class="button recording-action-button recording-action-button--segment-accept" id="recording-segment-accept" data-recording-action="segment_accept" type="button" aria-describedby="recording-action-hint" disabled>
+                  <span>接受片段</span><kbd class="recording-action-key" data-recording-shortcut-label aria-hidden="true"></kbd>
+                </button>
+                <button class="button recording-action-button recording-action-button--segment-reject" id="recording-segment-reject" data-recording-action="segment_reject" type="button" aria-describedby="recording-action-hint" disabled>
+                  <span>拒绝片段</span><kbd class="recording-action-key" data-recording-shortcut-label aria-hidden="true"></kbd>
+                </button>
+              </div>
+            </div>
+            <div class="standalone-reset-control" id="standalone-reset-control" hidden>
+              <button class="button standalone-control-button standalone-pause-button" id="standalone-pause-button" type="button" aria-describedby="recording-action-hint" disabled>
+                暂停推理
+              </button>
+              <button class="button standalone-control-button standalone-reset-button" id="standalone-reset-button" type="button" aria-describedby="recording-action-hint" disabled>
+                复位
+              </button>
+            </div>
+            <p class="recording-action-hint" id="recording-action-hint">推理启动后等待首条 action 自动开始录制。</p>
+          </div>
+          <div class="workflow-blockers" id="workflow-blockers" role="status" hidden></div>
+        </section>
+
+        <section class="panel diagnostics-panel" aria-labelledby="diagnostics-heading">
+          <div class="diagnostics-heading">
+            <div>
+              <p class="eyebrow">运行诊断</p>
+              <h2 id="diagnostics-heading">启动预检与实时指标</h2>
+            </div>
+            <div class="diagnostics-actions">
+              <button class="button button--secondary button--small" id="preflight-refresh" type="button" title="重新执行启动预检">预检</button>
+              <button class="button button--secondary button--small" id="runtime-metrics-refresh" type="button" title="刷新运行指标">刷新</button>
+            </div>
+          </div>
+          <p class="diagnostics-status" id="preflight-status" role="status" aria-live="polite">选择配置后自动检查。</p>
+          <div class="diagnostics-summary" id="preflight-summary">尚未检查</div>
+          <ul class="preflight-checks" id="preflight-checks" aria-live="polite"></ul>
+          <div class="runtime-metrics-grid" aria-label="运行指标">
+            <div><span>Policy FPS</span><strong id="debug-policy-fps">—</strong></div>
+            <div><span>Control FPS</span><strong id="debug-control-fps">—</strong></div>
+            <div><span>ActionExecutor</span><strong id="debug-action-manager">—</strong></div>
+            <div><span>Action FPS</span><strong id="debug-action-fps">—</strong></div>
+            <div><span>Device FPS</span><strong id="debug-device-fps">—</strong></div>
+            <div><span>队列 / 延迟</span><strong id="debug-action-queue">—</strong></div>
+          </div>
+          <details class="diagnostics-tuning">
+            <summary><span>调参与生成配置</span><span class="summary-hint">保存后重启生效</span></summary>
+            <div class="runtime-tuning-controls" id="runtime-tuning-controls"></div>
+            <div class="generated-config-actions">
+              <label class="generated-config-name" for="generated-config-id">
+                <span>配置名</span>
+                <input
+                  id="generated-config-id"
+                  type="text"
+                  maxlength="80"
+                  autocomplete="off"
+                  spellcheck="false"
+                >
+              </label>
+              <div class="generated-config-buttons">
+                <button
+                  class="button button--secondary button--small"
+                  id="generated-config-export"
+                  type="button"
+                  title="生成独立运行配置"
+                >生成配置</button>
+                <button
+                  class="button button--primary button--small"
+                  id="current-config-save"
+                  type="button"
+                  title="将当前机器人、相机、夹爪和调参写回选中的 config"
+                >保存当前 config</button>
+              </div>
+            </div>
+            <p class="generated-config-status" id="generated-config-status" role="status" aria-live="polite"></p>
+          </details>
+        </section>
+
+        <details class="panel rail-logs">
+          <summary>
+            <span>设备日志</span>
+            <span class="summary-hint">展开</span>
+          </summary>
+          <div class="rail-log-body">
+            <div class="log-controls">
+              <label class="sr-only" for="log-device-select">日志来源</label>
+              <select id="log-device-select">
+                <option value="">全部设备</option>
+              </select>
+              <label class="check-control" for="log-autoscroll">
+                <input id="log-autoscroll" type="checkbox" checked>
+                <span>自动滚动</span>
+              </label>
+              <button class="button button--secondary button--small" id="clear-logs-button" type="button">清空</button>
+            </div>
+            <div class="log-view" id="log-view" role="log" aria-live="off" aria-label="设备运行日志">
+              <p class="log-empty" id="log-empty">暂无日志。</p>
+            </div>
+          </div>
+        </details>
+      </aside>
+
+      <div
+        class="workspace-splitter"
+        id="workspace-splitter"
+        role="separator"
+        aria-label="调整控制栏与视觉区宽度"
+        aria-orientation="vertical"
+        aria-valuemin="280"
+        aria-valuemax="620"
+        aria-valuenow="360"
+        tabindex="0"
+      >
+        <span class="workspace-splitter__handle" aria-hidden="true"></span>
+      </div>
+
+      <div class="visual-workspace">
+        <div class="primary-workspace">
+          <section class="panel arm-viewer-panel hardware-panel--compact" aria-labelledby="arm-viewer-heading">
+            <div class="panel-heading panel-heading--workspace">
+              <div>
+                <p class="eyebrow">双臂状态</p>
+                <h2 id="arm-viewer-heading">机械臂与夹爪</h2>
+              </div>
+              <div class="viewer-toolbar-mount" id="arm-viewer-toolbar-mount" aria-label="3D 视图工具栏">
+                <div class="viewer-toolbar-bindings" role="group" aria-label="机械臂连接选择">
+                  <button class="hardware-discovery-refresh" id="hardware-discovery-refresh" type="button" title="重新扫描摄像头和机械臂" aria-label="重新扫描摄像头和机械臂">&#8635;</button>
+                  <label class="hardware-binding" for="robot-left-binding-select">
+                    <span>左臂</span>
+                    <select id="robot-left-binding-select" aria-label="左臂物理序列号" disabled>
+                      <option value="">正在发现…</option>
+                    </select>
+                  </label>
+                  <label class="hardware-binding" for="robot-right-binding-select">
+                    <span>右臂</span>
+                    <select id="robot-right-binding-select" aria-label="右臂物理序列号" disabled>
+                      <option value="">正在发现…</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="viewer-toolbar-devices" role="group" aria-label="机械臂设备控制">
+                  <div class="panel-device-control">
+                    <span class="panel-device-requirement" id="rizon-device-requirement" data-kind="unused">未使用</span>
+                    <button class="panel-device-toggle" id="robot-device-toggle" type="button" role="switch" aria-checked="false" disabled>
+                      启动 Rizon
+                    </button>
+                  </div>
+                  <div class="panel-device-control">
+                    <span class="panel-device-requirement" id="i2rt-head-device-requirement" data-kind="unused">未使用</span>
+                    <button class="panel-device-toggle" id="i2rt-head-device-toggle" type="button" role="switch" aria-checked="false" aria-label="启动或停止 Yam 头部机械臂" disabled>
+                      Yam 头臂未配置
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <section class="gripper-check" aria-labelledby="gripper-check-heading">
+              <div class="gripper-check__heading">
+                <div>
+                  <p class="eyebrow">空闲检查</p>
+                  <h3 id="gripper-check-heading">夹爪标定与开合</h3>
+                </div>
+                <div class="gripper-check__actions">
+                  <button class="button button--secondary button--small gripper-permission-button" id="gripper-authorize-permissions" type="button" hidden>
+                    修复设备权限
+                  </button>
+                  <button class="button button--secondary button--small gripper-calibrate-button" id="gripper-calibrate-all" type="button" disabled>
+                    一键标定双夹爪
+                  </button>
+                </div>
+              </div>
+              <div class="gripper-check__rows">
+                <div class="gripper-control-row" data-gripper-side="left">
+                  <strong class="gripper-control-row__side">左夹爪</strong>
+                  <span class="gripper-state-badge" id="gripper-left-status" data-status="unavailable">不可用</span>
+                  <label class="gripper-port-binding" for="gripper-left-port">
+                    <span class="sr-only">左夹爪串口</span>
+                    <select id="gripper-left-port" data-gripper-port="left" aria-label="左夹爪 ttyUSB 串口" disabled>
+                      <option value="">正在发现 ttyUSB…</option>
+                    </select>
+                  </label>
+                  <div class="gripper-slider-control">
+                    <span class="gripper-slider-end" id="gripper-left-min-label">0% 闭合</span>
+                    <input id="gripper-left-position" data-gripper-position="left" type="range" min="0" max="100" step="1" value="0" aria-label="左夹爪目标开合百分比" aria-describedby="gripper-left-value gripper-check-reason" disabled>
+                    <span class="gripper-slider-end gripper-slider-end--max" id="gripper-left-max-label">100% 张开</span>
+                  </div>
+                  <output class="gripper-position-value" id="gripper-left-value" for="gripper-left-position">实际 —</output>
+                </div>
+                <div class="gripper-control-row" data-gripper-side="right">
+                  <strong class="gripper-control-row__side">右夹爪</strong>
+                  <span class="gripper-state-badge" id="gripper-right-status" data-status="unavailable">不可用</span>
+                  <label class="gripper-port-binding" for="gripper-right-port">
+                    <span class="sr-only">右夹爪串口</span>
+                    <select id="gripper-right-port" data-gripper-port="right" aria-label="右夹爪 ttyUSB 串口" disabled>
+                      <option value="">正在发现 ttyUSB…</option>
+                    </select>
+                  </label>
+                  <div class="gripper-slider-control">
+                    <span class="gripper-slider-end" id="gripper-right-min-label">0% 闭合</span>
+                    <input id="gripper-right-position" data-gripper-position="right" type="range" min="0" max="100" step="1" value="0" aria-label="右夹爪目标开合百分比" aria-describedby="gripper-right-value gripper-check-reason" disabled>
+                    <span class="gripper-slider-end gripper-slider-end--max" id="gripper-right-max-label">100% 张开</span>
+                  </div>
+                  <output class="gripper-position-value" id="gripper-right-value" for="gripper-right-position">实际 —</output>
+                </div>
+              </div>
+              <p class="gripper-check__reason" id="gripper-check-reason" role="status">机械臂设备就绪且推理空闲后可检查夹爪。</p>
+            </section>
+          </section>
+
+          <section class="panel cameras-panel" id="camera-workspace" aria-labelledby="cameras-heading">
+            <div class="panel-heading panel-heading--workspace">
+              <div>
+                <p class="eyebrow">SHM 实时读取</p>
+                <h2 id="cameras-heading">相机画面</h2>
+              </div>
+              <p class="panel-note">启动后自动预览</p>
+            </div>
+
+            <div class="camera-grid" id="camera-grid" aria-live="polite"></div>
+          </section>
+        </div>
+
+        <section class="panel workspace-reserve recording-timeline-panel" id="workspace-reserve" aria-labelledby="recording-timeline-heading">
+          <div class="recording-timeline-heading">
+            <div class="recording-timeline-title">
+              <p class="eyebrow">推理录制</p>
+              <h2 id="recording-timeline-heading">Episode 时间轴</h2>
+            </div>
+            <div class="recording-timeline-summary" aria-live="polite">
+              <span class="recording-state-badge" id="recording-state-badge" data-status="stopped">未启动</span>
+              <strong id="recording-episode-label">EP —</strong>
+              <span id="recording-frame-count">0 frames</span>
+              <time id="recording-elapsed" datetime="PT0S">00:00.0</time>
+            </div>
+          </div>
+          <div class="recording-timeline-body">
+            <div class="recording-camera-roles" id="recording-camera-roles" aria-label="录制相机角色" aria-live="polite">
+              <div class="recording-camera-role" data-camera-role="head" data-status="unknown">
+                <div class="recording-camera-role__heading"><span class="recording-camera-role__label">Head</span><span class="recording-camera-role__status" data-camera-role-status>未上报</span></div>
+                <div class="recording-camera-role__field"><span>Device</span><code data-camera-role-device>—</code></div>
+                <div class="recording-camera-role__field"><span>Topic</span><code data-camera-role-topic>—</code></div>
+                <div class="recording-camera-role__field"><span>SHM</span><code data-camera-role-shm>—</code></div>
+              </div>
+              <div class="recording-camera-role" data-camera-role="left" data-status="unknown">
+                <div class="recording-camera-role__heading"><span class="recording-camera-role__label">Left</span><span class="recording-camera-role__status" data-camera-role-status>未上报</span></div>
+                <div class="recording-camera-role__field"><span>Device</span><code data-camera-role-device>—</code></div>
+                <div class="recording-camera-role__field"><span>Topic</span><code data-camera-role-topic>—</code></div>
+                <div class="recording-camera-role__field"><span>SHM</span><code data-camera-role-shm>—</code></div>
+              </div>
+              <div class="recording-camera-role" data-camera-role="right" data-status="unknown">
+                <div class="recording-camera-role__heading"><span class="recording-camera-role__label">Right</span><span class="recording-camera-role__status" data-camera-role-status>未上报</span></div>
+                <div class="recording-camera-role__field"><span>Device</span><code data-camera-role-device>—</code></div>
+                <div class="recording-camera-role__field"><span>Topic</span><code data-camera-role-topic>—</code></div>
+                <div class="recording-camera-role__field"><span>SHM</span><code data-camera-role-shm>—</code></div>
+              </div>
+            </div>
+            <div class="recording-timeline-empty" id="recording-timeline-empty">
+              当前配置未启用推理录制。
+            </div>
+            <div class="recording-timeline-content" id="recording-timeline-content" hidden>
+              <div class="recording-track-scale" aria-hidden="true">
+                <span>0</span>
+                <span id="recording-scale-end">00:00.0</span>
+              </div>
+              <div class="recording-track" id="recording-track" role="img" aria-label="当前 episode 尚无录制数据">
+                <div class="recording-track-segments" id="recording-track-segments"></div>
+                <div class="recording-track-checkpoints" id="recording-track-checkpoints"></div>
+                <span class="recording-track-cursor" id="recording-track-cursor" aria-hidden="true"></span>
+              </div>
+              <div class="recording-timeline-footer">
+                <div class="recording-legend" aria-label="时间轴图例">
+                  <span><i class="recording-legend__swatch recording-legend__swatch--accept" aria-hidden="true"></i>接受</span>
+                  <span><i class="recording-legend__swatch recording-legend__swatch--reject" aria-hidden="true"></i>拒绝（保留）</span>
+                  <span><i class="recording-legend__swatch recording-legend__swatch--untagged" aria-hidden="true"></i>未标记</span>
+                  <span><i class="recording-legend__checkpoint" aria-hidden="true"></i>Checkpoint</span>
+                </div>
+                <p class="recording-reference" id="recording-reference">按当前 episode 范围缩放</p>
+              </div>
+            </div>
+            <p class="recording-timeline-error" id="recording-timeline-error" role="alert" hidden></p>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <dialog class="confirm-dialog checkpoint-browser-dialog" id="checkpoint-browser-dialog" aria-labelledby="checkpoint-browser-title" aria-describedby="checkpoint-browser-status">
+    <form id="checkpoint-browser-form" novalidate>
+      <div class="checkpoint-browser-heading">
+        <div>
+          <p class="eyebrow" id="checkpoint-browser-eyebrow">服务器文件浏览</p>
+          <h2 id="checkpoint-browser-title">选择临时 checkpoint</h2>
+        </div>
+        <button class="button button--secondary button--small" id="checkpoint-browser-refresh" type="button">刷新</button>
+      </div>
+      <p class="checkpoint-browser-hint" id="checkpoint-browser-hint">仅可选择允许位置内的 checkpoint 目录或 FastWAM 权重文件；不会修改源 config。</p>
+      <div class="checkpoint-browser-toolbar">
+        <button class="button button--secondary button--small" id="checkpoint-browser-up" type="button" disabled>上一级</button>
+        <label class="checkpoint-browser-current-location" for="checkpoint-browser-path">
+          <span>路径</span>
+          <input class="checkpoint-browser-path" id="checkpoint-browser-path" type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="8192" aria-describedby="checkpoint-browser-status checkpoint-browser-error" placeholder="粘贴服务器绝对路径">
+        </label>
+        <button class="button button--secondary button--small" id="checkpoint-browser-go" type="button">打开</button>
+      </div>
+      <div class="checkpoint-browser-roots" id="checkpoint-browser-roots" aria-label="快速切换存储位置" hidden></div>
+      <div class="checkpoint-browser-list" id="checkpoint-browser-list" role="list" aria-busy="false"></div>
+      <p class="checkpoint-browser-status" id="checkpoint-browser-status" role="status" aria-live="polite">正在读取服务器目录…</p>
+      <p class="checkpoint-browser-error" id="checkpoint-browser-error" role="alert" hidden></p>
+      <div class="dialog-actions checkpoint-browser-actions">
+        <button class="button button--secondary" id="checkpoint-browser-cancel" type="button">取消</button>
+        <button class="button button--primary" id="checkpoint-browser-select" type="submit" disabled>选择当前目录</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="confirm-dialog" id="confirm-dialog" aria-labelledby="confirm-title" aria-describedby="confirm-message">
+    <form method="dialog">
+      <h2 id="confirm-title">确认操作</h2>
+      <p id="confirm-message"></p>
+      <div class="dialog-actions">
+        <button class="button button--secondary" value="cancel">取消</button>
+        <button class="button button--danger" id="confirm-action-button" value="confirm">确认</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="confirm-dialog gripper-permission-dialog" id="gripper-permission-dialog" aria-labelledby="gripper-permission-title" aria-describedby="gripper-permission-summary gripper-permission-warning">
+    <form id="gripper-permission-form" novalidate>
+      <h2 id="gripper-permission-title">设备权限不足</h2>
+      <p id="gripper-permission-summary">需要先为当前 config 的 ttyUSB 或 Yam CAN 目标完成授权。</p>
+      <p class="gripper-permission-warning" id="gripper-permission-warning" role="alert"></p>
+      <label class="gripper-password-field" id="gripper-password-field" for="gripper-sudo-password" hidden>
+        <span>sudo 密码（仅通过本次请求的 stdin 使用）</span>
+        <input id="gripper-sudo-password" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="512" data-form-type="other" data-1p-ignore="true" data-lpignore="true" disabled>
+      </label>
+      <p class="gripper-permission-error" id="gripper-permission-error" role="alert" hidden></p>
+      <div class="dialog-actions">
+        <button class="button button--secondary" id="gripper-permission-cancel" type="button">取消</button>
+        <button class="button button--primary" id="gripper-permission-submit" type="submit">使用 sudo 授权</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast-region" id="toast-region" aria-live="polite" aria-atomic="true"></div>
+
+  <noscript>
+    <div class="noscript-warning">此控制台需要 JavaScript 才能读取状态和控制设备。</div>
+  </noscript>
+</body>
+</html>

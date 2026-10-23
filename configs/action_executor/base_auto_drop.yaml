@@ -1,0 +1,9 @@
+action_executor:
+  type: base_policy_runner
+  robot_control_shms: ${policy.controls}
+  execution_fps: ${policy.control_fps}
+  chunk_length: ${policy.chunk_length}
+  signal_files: ${runtime.signal_files}
+  chunk_manager:
+    type: base_manager
+    drop_first_actions: auto

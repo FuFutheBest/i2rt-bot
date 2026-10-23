@@ -1,0 +1,57 @@
+{
+    "calibration_id": "lab_pro_visual_angle_width_20260528_detector_space_v1",
+    "base_calibration_id": "umi_roi_angle_width_v0",
+    "description": "Robopocket 2.0 Pro detector-space ROI marker line angle to physical gripper width. ROI endpoints come from the 0529_test episode_0000/episode_0001 observed full open/close angle range using the packaged detector pipeline; the right open endpoint uses the high-percentile open cluster instead of the absolute-max outlier so the observed right peak maps close to physical max. Affine is identity so endpoint calibration owns the current physical min/max mapping.",
+    "angle_unit": "rad",
+    "roi_angle_input_unit": "deg",
+    "cad_unit": "mm",
+    "output_width_unit": "m",
+    "width_definition": "effective_fixed_minz_to_moving_minz",
+    "line_angle_period_deg": 180.0,
+    "theta_open_max_deg": 87.305265,
+    "cad_minz": {
+        "fixed_xz_mm": [-20.275620800907134, -39.83679922734794],
+        "moving_close_xz_mm": [-11.22644270037772, -44.81262453668076],
+        "pivot_center_xz_mm": [47.483275050464464, 11.648549887960074],
+        "rotation_sign": 1,
+        "close_distance_offset_mm": 10.326977379857968,
+        "close_normalized_open_width_mm": 111.46648188511536,
+        "physical_width_min_mm": 0.0,
+        "physical_width_max_mm": 121.79345926497332
+    },
+    "roi_angle_endpoints_deg_mod180": {
+        "left": {
+            "close": 126.07371171492574,
+            "open": 76.01325053571573,
+            "direction": "decreasing_with_opening"
+        },
+        "right": {
+            "close": 54.84295430595423,
+            "open": 104.5,
+            "direction": "increasing_with_opening"
+        }
+    },
+    "affine_width_norm_correction": {
+        "input": "roi_cad_norm",
+        "output": "corrected_width_norm",
+        "formula": "corrected_width_norm = clamp(slope * roi_cad_norm + intercept, 0, 1)",
+        "source": "identity affine after 0529 lab/pro full-open/full-close endpoint refresh; right open endpoint uses a 104.5 deg high-percentile endpoint to avoid an absolute-max open-angle outlier suppressing the observed peak",
+        "raw_width_role": "local sanity baseline only, not absolute global truth",
+        "generated_from_checkpoint": "CHECKPOINT_LAB_PRO_0529_ENDPOINT_IDENTITY_AFFINE_BASELINE_2026_06_01",
+        "sides": {
+            "left": {
+                "slope": 1.0,
+                "intercept": 0.0,
+                "sample_count": 1463,
+                "fit_note": "identity baseline; observed endpoint extremes provide min/max calibration"
+            },
+            "right": {
+                "slope": 1.0,
+                "intercept": 0.0,
+                "sample_count": 1463,
+                "fit_note": "identity baseline; observed endpoint extremes provide min/max calibration"
+            }
+        }
+    }
+}
+

@@ -1,0 +1,22 @@
+{
+  "hsv_lower": [
+    48,
+    153,
+    16
+  ],
+  "hsv_upper": [
+    75,
+    255,
+    142
+  ],
+  "erode_px": 0,
+  "per_roi_detection": true,
+  "min_candidate_area": 80.0,
+  "max_line_error": 5.0,
+  "min_contour_area": 80.0,
+  "roi_padding": 5,
+  "left_open_angle": 76.7982233157118,
+  "left_closed_angle": 126.63135037810864,
+  "right_open_angle": 104.21604997379147,
+  "right_closed_angle": 54.86497177286351
+}

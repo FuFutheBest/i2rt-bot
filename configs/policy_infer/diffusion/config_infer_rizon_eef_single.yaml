@@ -1,0 +1,79 @@
+# @package _global_
+
+defaults:
+  - /devices/infer@devices: rizon_single_eef_abs_iphone
+  - /device_manager: sync
+  - /action_executor: base
+  - /consumer: default
+  - /runtime: default
+  - _self_
+
+camera:
+  left_capture_id: 0
+
+device_manager:
+  device_manager:
+    master_device_class_id: 1
+    params:
+      buffer_size: 100
+
+shared:
+  summary_shm_name: device_summary_data
+
+action_executor:
+  action_executor:
+    execution_fps: 10.0
+
+global_settings:
+  log_level: INFO
+  restart_on_failure: true
+  max_restart_attempts: 3
+  restart_delay: 2.0
+
+hydra:
+  run:
+    dir: .
+  output_subdir: null
+
+# Provide policy configuration for DiffusionPolicyInfer consumer
+summary_shm: device_summary_data
+
+policy:
+  class: DiffusionPolicyIPhoneUMI
+  params:
+    ckpt_dir: "/home/fangyuan/lt_ws/SuperInference/third_party/umi_base/data/outputs/2025.10.21/16.28.06_train_diffusion_unet_timm_single_right_arm_pick_and_place_s1_image_only"
+    num_inference_steps: 8
+    device: "cuda"
+    obs_time_interval: 0.04
+    tcp_umi_json_path: "/home/fangyuan/lt_ws/SuperInference/calibration/tcp_to_umi_transform.json"
+    use_relative_action: true
+
+  fps: 5
+  chunk_length: 10
+  robot_latency_steps: 4
+  manual_confirm: false
+  gripper_latency_steps: 4
+  obs:
+    devices:
+      - "IPhoneCameraDevice_0"
+      - "RizonRobot_1"
+  controls:
+    - endpoint:
+        device: RizonRobot
+        device_class_id: 1
+        port: command
+      shape: [8]
+      dtype: "float64"
+  infer_recorder:
+    enabled: false
+    camera_id: 6
+    save_path: "./recordings"
+    width: 1600
+    height: 1200
+    fps: 10.0
+    scale: 0.4
+    show_window: true
+    enable_recording: true
+    auto_start_recording: true
+    record_key: "r"
+    window_name: "Inference Recorder"

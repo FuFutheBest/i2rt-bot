@@ -1,0 +1,88 @@
+# @package _global_
+
+defaults:
+  - /devices/infer@devices: rizon_dual_eef_abs_opencv
+  - /device_manager: sync
+  - /action_executor: base
+  - /consumer: default
+  - /runtime: default
+  - _self_
+
+device_manager:
+  device_manager:
+    master_device_class_id: 2
+    params:
+      buffer_size: 500
+
+# Camera configuration - modify these to change camera IDs
+camera:
+  left_capture_id: 0
+  right_capture_id: 2
+
+# Robot configuration
+robot:
+  home: 0  # Home preset index (0-5)
+
+shared:
+  summary_shm_name: device_summary_data
+
+action_executor:
+  action_executor:
+    execution_fps: 25.0
+
+global_settings:
+  log_level: INFO
+  restart_on_failure: true
+  max_restart_attempts: 3
+  restart_delay: 2.0
+
+hydra:
+  run:
+    dir: .
+  output_subdir: null
+
+summary_shm: device_summary_data
+
+policy:
+  class: DiffusionPolicy
+  params:
+    ckpt_dir: "/home/zixiying/Desktop/xuehan/SuperInference_replay_debug/data/outputs/2025.09.29_pick_umi_mask_bf16/09.28.16"
+    num_inference_steps: 16
+    device: "cuda"
+    obs_time_interval: 0.04
+    tcp_umi_json_path: "/home/zixiying/Desktop/yesen/SuperInference/calibration/tcp_to_vive_transform.json"
+    # Image preprocessing parameters
+    preprocess_resize_height: 300
+    preprocess_resize_width: 400
+    center_crop_min_ratio: 0.05
+    center_crop_max_ratio: 0.95
+  fps: 1.5
+  original_chunk_length: 40
+  chunk_length: 16
+  robot_latency_steps: 5
+  gripper_latency_steps: 5
+  obs:
+    devices:
+      - "OpenCVCameraDevice_0"
+      - "OpenCVCameraDevice_1"
+      - "RizonRobot_2"
+  controls:
+    - endpoint:
+        device: RizonRobot
+        device_class_id: 2
+        port: command
+      shape: [16]
+      dtype: "float64"
+  infer_recorder:
+    enabled: true
+    camera_id: 6
+    save_path: ${policy.params.ckpt_dir}/recordings
+    width: 640
+    height: 480
+    fps: 10.0
+    scale: 0.4
+    show_window: true
+    enable_recording: true
+    auto_start_recording: true
+    record_key: "r"
+    window_name: "Inference Recorder"

@@ -1,0 +1,29 @@
+default_language_version:
+  python: python3.10
+
+# Vendored projects have their own hooks and formatting policy.
+exclude: '^third_party/'
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: check-added-large-files
+        args: [--maxkb=5000]
+
+  # Use the repository's pinned development dependency instead of creating a
+  # second Ruff environment with a potentially different version.
+  - repo: local
+    hooks:
+      - id: ruff-contract
+        name: ruff contract checks
+        entry: python -m ruff check --select E9,F63,F7,F82
+        language: system
+        types: [python]
+        files: '^(consumer/inference/common/|consumer/policy_history/|device_starter\.py$|windows_device_start\.py$|devices/(__init__|camera)\.py$|devices/cameras/|devices/robots/base\.py$|devices/robots/rizon/|manager/|tests/|utils/(contracts|config_schema|lk_gripper_presets)\.py$)'

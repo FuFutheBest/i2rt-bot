@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>NEDF 录制检查</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='recording_replay.css', v='20260806-select-accepted-v1') }}">
+</head>
+<body>
+  <a class="skip-link" href="#recording-viewer">跳到录制回放</a>
+  <div class="replay-shell">
+    <header class="replay-topbar">
+      <div class="replay-brand">
+        <a
+          class="navigation-button"
+          id="control-panel-navigation"
+          href="/"
+          title="返回控制面板"
+          aria-label="返回控制面板"
+        >
+          <span aria-hidden="true">&#8592;</span>
+          <span>控制台</span>
+        </a>
+        <div>
+          <h1>NEDF 录制检查</h1>
+          <p id="recording-root-state">读取录制目录</p>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <span class="connection-state" id="recording-connection-state">
+          <span class="connection-dot" aria-hidden="true"></span>
+          <span>连接中</span>
+        </span>
+        <button class="icon-button" id="recordings-refresh" type="button" title="刷新录制列表" aria-label="刷新录制列表">&#8635;</button>
+      </div>
+    </header>
+
+    <main class="replay-workspace" id="recording-viewer">
+      <aside class="episode-rail" aria-label="录制 episode">
+        <div class="rail-heading">
+          <div>
+            <p class="eyebrow">Episodes</p>
+            <h2>录制列表</h2>
+          </div>
+          <div class="episode-rail-actions">
+            <span class="count-label" id="recording-count">0</span>
+            <span class="selection-count" id="recording-selection-count" aria-live="polite">已选 0</span>
+            <button class="selection-clear" id="recording-selection-clear" type="button" disabled title="清除批量选择" aria-label="清除批量选择">&times;</button>
+            <button class="export-open-button" id="recording-export-open" type="button" disabled>
+              <span aria-hidden="true">&#8681;</span>
+              <span>LeRobot</span>
+            </button>
+            <button class="delete-open-button" id="recording-delete-open" type="button" disabled>
+              <span aria-hidden="true">&#128465;</span>
+              <span>&#21024;&#38500;</span>
+            </button>
+          </div>
+        </div>
+        <button class="export-activity" id="recording-export-activity" type="button" hidden></button>
+        <section class="episode-filters" aria-label="录制筛选">
+          <label class="episode-filter episode-filter--date" for="recordings-date-filter">
+            <span>日期目录</span>
+            <select id="recordings-date-filter">
+              <option value="all">全部日期</option>
+            </select>
+          </label>
+          <label class="episode-filter" for="recordings-status-filter">
+            <span>结果</span>
+            <select id="recordings-status-filter">
+              <option value="all">全部状态</option>
+              <option value="accepted">已接受</option>
+              <option value="rejected">已拒绝</option>
+              <option value="incomplete">未完成</option>
+              <option value="unfinalized">未终结</option>
+            </select>
+          </label>
+          <label class="episode-search" for="recordings-search">
+            <span class="sr-only">搜索 episode、任务或编号</span>
+            <input id="recordings-search" type="search" maxlength="120" autocomplete="off" placeholder="搜索 episode / 任务 / 编号">
+          </label>
+        </section>
+        <div class="episode-browser">
+          <div class="episode-list" id="recording-episode-list" role="listbox" aria-label="选择录制 episode">
+            <div class="placeholder-row">正在读取录制...</div>
+          </div>
+          <div class="episode-pagination" aria-label="录制列表分页">
+            <button class="pagination-button" id="recordings-page-previous" type="button" disabled title="上一页" aria-label="上一页">&#8592;</button>
+            <button
+              class="page-selection"
+              id="recordings-select-accepted"
+              type="button"
+              disabled
+              title="选择当前日期和搜索范围内的全部 success episode"
+            >全部接受</button>
+            <span id="recordings-page-readout">0 / 0</span>
+            <button class="pagination-button" id="recordings-page-next" type="button" disabled title="下一页" aria-label="下一页">&#8594;</button>
+          </div>
+        </div>
+        <section class="episode-inspector" aria-labelledby="episode-inspector-title">
+          <div class="section-heading">
+            <h2 id="episode-inspector-title">Episode 状态</h2>
+          </div>
+          <dl class="episode-facts" id="recording-episode-facts">
+            <div><dt>状态</dt><dd>未选择</dd></div>
+            <div><dt>结果</dt><dd>-</dd></div>
+            <div><dt>帧数</dt><dd>-</dd></div>
+            <div><dt>时长</dt><dd>-</dd></div>
+          </dl>
+          <div class="issue-list" id="recording-issues" aria-live="polite">
+            <p class="muted-copy">选择 episode 后显示检查问题。</p>
+          </div>
+        </section>
+      </aside>
+
+      <section class="viewer-panel" aria-labelledby="viewer-title">
+        <div class="viewer-heading">
+          <div>
+            <p class="eyebrow">Joint / TCP Replay</p>
+            <h2 id="viewer-title">双臂轨迹与同步视频</h2>
+          </div>
+          <span class="viewer-source" id="recording-viewer-source">未选择 episode</span>
+        </div>
+        <div class="recording-viewer-stage">
+          <div id="recording-arm-viewer-root" class="recording-arm-viewer" aria-label="Flexiv 双臂录制回放与 TCP 轨迹"></div>
+          <div class="viewer-unavailable" id="recording-viewer-unavailable" hidden role="status">
+            <strong>三维轨迹不可用</strong>
+            <span id="recording-viewer-unavailable-reason">该 episode 没有可读取的 TCP 或 joint topic。</span>
+          </div>
+        </div>
+        <section class="recording-video-strip" aria-label="同步录制视频">
+          <article class="recording-video-card" data-video-role="left">
+            <header>左腕</header>
+            <video id="recording-video-left" muted playsinline preload="metadata"></video>
+            <span class="recording-video-placeholder">视频未就绪</span>
+          </article>
+          <article class="recording-video-card" data-video-role="head">
+            <header>头部</header>
+            <video id="recording-video-head" muted playsinline preload="metadata"></video>
+            <span class="recording-video-placeholder">视频未就绪</span>
+          </article>
+          <article class="recording-video-card" data-video-role="right">
+            <header>右腕</header>
+            <video id="recording-video-right" muted playsinline preload="metadata"></video>
+            <span class="recording-video-placeholder">视频未就绪</span>
+          </article>
+        </section>
+      </section>
+
+      <aside class="topic-rail" aria-labelledby="topic-health-title">
+        <div class="rail-heading">
+          <div>
+            <p class="eyebrow" id="recording-topic-format">NEDF</p>
+            <h2 id="topic-health-title">Topic 健康</h2>
+          </div>
+        </div>
+        <div class="joint-health" id="recording-joint-health"></div>
+        <div class="camera-role-health" id="recording-camera-role-health" aria-label="语义相机健康状态"></div>
+        <div class="topic-list" id="recording-topic-list">
+          <div class="placeholder-row">选择 episode 后显示 topic。</div>
+        </div>
+      </aside>
+
+      <section class="timeline-panel" aria-labelledby="timeline-title">
+        <div class="timeline-heading">
+          <div>
+            <p class="eyebrow">Timeline</p>
+            <h2 id="timeline-title">录制时间轴</h2>
+          </div>
+          <div class="timeline-readout" aria-live="polite">
+            <span id="recording-frame-readout">Frame - / -</span>
+            <span id="recording-time-readout">00:00.000 / 00:00.000</span>
+          </div>
+        </div>
+        <section class="gripper-chart" id="recording-gripper-chart" aria-labelledby="gripper-chart-title">
+          <div class="gripper-chart__heading">
+            <span id="gripper-chart-title">夹爪开合曲线</span>
+            <span class="gripper-chart__value gripper-chart__value--left" id="recording-gripper-left-value">左 —</span>
+            <span class="gripper-chart__value gripper-chart__value--right" id="recording-gripper-right-value">右 —</span>
+          </div>
+          <div class="gripper-chart__plot">
+            <svg id="recording-gripper-plot" viewBox="0 0 1000 120" preserveAspectRatio="none" role="img" aria-label="左右夹爪开合曲线">
+              <line class="gripper-grid-line" x1="0" y1="20" x2="1000" y2="20"></line>
+              <line class="gripper-grid-line" x1="0" y1="60" x2="1000" y2="60"></line>
+              <line class="gripper-grid-line" x1="0" y1="100" x2="1000" y2="100"></line>
+              <path class="gripper-curve gripper-curve--left" id="recording-gripper-left-path"></path>
+              <path class="gripper-curve gripper-curve--right" id="recording-gripper-right-path"></path>
+              <line class="gripper-chart-cursor" id="recording-gripper-cursor" x1="0" y1="0" x2="0" y2="120"></line>
+            </svg>
+            <span class="gripper-chart__empty" id="recording-gripper-empty">该 episode 没有夹爪曲线</span>
+          </div>
+        </section>
+        <div class="timeline-controls">
+          <div class="timeline-transport">
+            <button class="play-button" id="recording-play-toggle" type="button" disabled title="播放" aria-label="播放">&#9654;</button>
+            <label class="speed-control" for="recording-speed">
+              <span>速度</span>
+              <select id="recording-speed">
+                <option value="0.25">0.25x</option>
+                <option value="0.5">0.5x</option>
+                <option value="1" selected>1x</option>
+                <option value="2">2x</option>
+              </select>
+            </label>
+          </div>
+          <div class="scrub-stack">
+            <div class="dense-track" id="recording-dense-track" aria-label="接受、拒绝与未标注片段"></div>
+            <input id="recording-scrubber" type="range" min="0" max="0" value="0" step="1" disabled aria-label="录制帧位置">
+          </div>
+        </div>
+        <div class="timeline-legend" id="recording-dense-legend">
+          <span><i class="legend-swatch legend-swatch--accept"></i>接受片段</span>
+          <span><i class="legend-swatch legend-swatch--reject"></i>拒绝片段</span>
+          <span><i class="legend-swatch legend-swatch--other"></i>未标注</span>
+          <span><i class="legend-checkpoint"></i>片段边界</span>
+        </div>
+      </section>
+    </main>
+  </div>
+  <dialog class="export-dialog" id="recording-export-dialog" aria-labelledby="recording-export-title">
+    <form class="export-dialog__surface" id="recording-export-form" method="dialog">
+      <header class="export-dialog__header">
+        <div>
+          <p class="eyebrow">LeRobot v2.1</p>
+          <h2 id="recording-export-title">批量导出</h2>
+        </div>
+        <button class="icon-button" id="recording-export-close" type="button" title="关闭" aria-label="关闭">&times;</button>
+      </header>
+      <div class="export-dialog__body">
+        <dl class="export-facts">
+          <div><dt>选择</dt><dd id="recording-export-selection">0 episodes</dd></div>
+          <div><dt>状态</dt><dd id="recording-export-state">待提交</dd></div>
+        </dl>
+        <label class="export-name" for="recording-export-name">
+          <span>Dataset 名称</span>
+          <input id="recording-export-name" name="dataset_name" type="text" maxlength="128" autocomplete="off" spellcheck="false" required pattern="[A-Za-z0-9][A-Za-z0-9._-]{0,127}">
+        </label>
+        <div class="export-progress" id="recording-export-progress" hidden>
+          <progress id="recording-export-progress-bar" max="1" value="0"></progress>
+          <span id="recording-export-progress-label"></span>
+        </div>
+        <div class="export-result" id="recording-export-result" hidden>
+          <span>输出</span>
+          <code id="recording-export-path"></code>
+        </div>
+        <p class="export-error" id="recording-export-error" hidden role="alert"></p>
+      </div>
+      <footer class="export-dialog__footer">
+        <button class="secondary-button" id="recording-export-cancel" type="button">关闭</button>
+        <button class="primary-button" id="recording-export-submit" type="submit" disabled>
+          <span aria-hidden="true">&#8681;</span>
+          <span>导出所选</span>
+        </button>
+      </footer>
+    </form>
+  </dialog>
+  <dialog class="export-dialog delete-dialog" id="recording-delete-dialog" aria-labelledby="recording-delete-title">
+    <form class="export-dialog__surface" id="recording-delete-form" method="dialog">
+      <header class="export-dialog__header">
+        <div>
+          <p class="eyebrow">Permanent deletion</p>
+          <h2 id="recording-delete-title">&#30830;&#35748;&#21024;&#38500;&#24405;&#21046;</h2>
+        </div>
+        <button class="icon-button" id="recording-delete-close" type="button" title="&#20851;&#38381;" aria-label="&#20851;&#38381;">&times;</button>
+      </header>
+      <div class="export-dialog__body">
+        <p id="recording-delete-summary"></p>
+        <p class="delete-warning">&#28304; NEDF episode &#21644;&#20854;&#22238;&#25918;&#32531;&#23384;&#23558;&#34987;&#27704;&#20037;&#21024;&#38500;&#65292;&#27492;&#25805;&#20316;&#26080;&#27861;&#25764;&#38144;&#12290;</p>
+        <p class="export-error" id="recording-delete-error" hidden role="alert"></p>
+      </div>
+      <footer class="export-dialog__footer">
+        <button class="secondary-button" id="recording-delete-cancel" type="button">&#21462;&#28040;</button>
+        <button class="danger-button" id="recording-delete-confirm" type="submit">&#30830;&#35748;&#21024;&#38500;</button>
+      </footer>
+    </form>
+  </dialog>
+  <script type="module" src="{{ url_for('static', filename='recording_replay.js', v='20260806-select-accepted-v1') }}"></script>
+  <noscript><div class="noscript-message">需要 JavaScript 才能检查录制。</div></noscript>
+</body>
+</html>

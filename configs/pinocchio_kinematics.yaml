@@ -1,0 +1,31 @@
+# Pinocchio kinematics hardware script (utils/pinocchio_kinematics_solver.py, __main__).
+# Paths are relative to the project root unless absolute.
+
+task: calibrate_world_frame_transform # test_ik | calibrate_world_frame_transform
+urdf_path: assets/robot/rizon/flexiv_Rizon4R_kinematics.urdf
+# urdf_path: assets/robot/rizon/flexiv_Rizon4_kinematics.urdf
+dt: 0.1
+max_iters: 1000
+eps: 1.0e-5
+ee_frame: flange
+damping: 1.0e-6
+# robot_sn: Rizon4R-062070
+robot_sn: Rizon4R-062069
+backend: pybind
+settle_seconds: 4.0
+max_joint_vel: 1.0
+max_joint_acc: 2.0
+
+# test_ik only: 4x4 urdf_world_from_robot_world. Ignored for calibrate (solver uses identity).
+world_frame_transform:
+# w_urdf_T_w_rbt for Rizon4R-062070
+    - [-0.0013608856447698222, -0.0031357859822335175, 0.9999941574011995, -0.00013582366982351475]
+    - [0.002358722477313538, 0.9999922915549982, 0.0031389901016189103, 0.0017764365284734527]
+    - [-0.9999962922023943, 0.002362980502812789, -0.0013534787055772856, 0.00016435057668596792]
+    - [0.0, 0.0, 0.0, 1.0]
+
+# One waypoint [j1, j2, ...] or several: [[j1..], [j1..], ...]; length each row must be nq.
+source_joints: [[1.32842, 1.12786, 0.98534, 2.05335, 0.71578, 2.13423, 1.14568],
+ [1.42655, 1.00055, 0.80001, 1.84983, 0.64973, 2.13412, 1.14959],
+ [1.28521, 1.00055, 0.80001, 1.47614, 0.52172, 2.13412, 0.84926],
+ [1.05935, 1.00055, 0.68118, 1.69881, 0.40707, 2.13413, 0.84926]]

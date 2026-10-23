@@ -1,0 +1,67 @@
+version: 1
+default_profile: lktech_fisheye_2cam
+
+profiles:
+  lktech_fisheye_2cam:
+    display_name: LKTech 夹爪 + 双鱼眼相机
+    device_config: i2rt_data_collect_async
+    teleop_config: configs/i2rt_bimanual_teleop.yaml
+    saver_config: configs/i2rt_nedf3_saver.yaml
+    require_recording_profile: false
+    gripper:
+      backend: lktech
+      calibration_supported: true
+      roles: [left, right]
+    cameras:
+      left:
+        backend: v4l2
+        environment: SI_I2RT_LEFT_CAMERA
+        preview_shm: WebCameraDevice_2_data
+      right:
+        backend: v4l2
+        environment: SI_I2RT_RIGHT_CAMERA
+        preview_shm: WebCameraDevice_3_data
+
+  yam_d405_2cam:
+    display_name: 原装 YAM 夹爪 + 双 D405
+    device_config: i2rt_d405_yam_collect_async
+    teleop_config: configs/i2rt_d405_yam_teleop.yaml
+    saver_config: configs/i2rt_d405_yam_saver.yaml
+    require_recording_profile: true
+    gripper:
+      backend: i2rt_can
+      calibration_supported: false
+      roles: []
+    cameras:
+      left:
+        backend: realsense
+        environment: SI_I2RT_LEFT_RS_SERIAL
+        preview_shm: RealSenseCamera_2_data
+      right:
+        backend: realsense
+        environment: SI_I2RT_RIGHT_RS_SERIAL
+        preview_shm: RealSenseCamera_3_data
+
+  yam_d405_3cam:
+    display_name: 原装 YAM 夹爪 + 三个 D405
+    device_config: i2rt_d405_yam_collect_async
+    teleop_config: configs/i2rt_d405_yam_teleop.yaml
+    saver_config: configs/i2rt_d405_yam_saver.yaml
+    require_recording_profile: true
+    gripper:
+      backend: i2rt_can
+      calibration_supported: false
+      roles: []
+    cameras:
+      left:
+        backend: realsense
+        environment: SI_I2RT_LEFT_RS_SERIAL
+        preview_shm: RealSenseCamera_2_data
+      right:
+        backend: realsense
+        environment: SI_I2RT_RIGHT_RS_SERIAL
+        preview_shm: RealSenseCamera_3_data
+      head:
+        backend: realsense
+        environment: SI_I2RT_HEAD_RS_SERIAL
+        preview_shm: RealSenseCamera_4_data

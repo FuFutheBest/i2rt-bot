@@ -1,0 +1,190 @@
+# @package _global_
+
+# Native FastWAM visual-memory launch config. Keep this as a complete rollout
+# config so device preflight and runtime bindings do not depend on another model.
+defaults:
+  - /devices/infer@devices: infer_rizon_fisheye_umi3_dual_fastwam
+  - /device_manager: camera_sync
+  - /action_executor: base_auto_drop
+  - /consumer: default
+  - /runtime: default
+  - _self_
+
+device_manager:
+  device_manager:
+    master_device_class_id: 0
+    params:
+      buffer_size: 500
+
+shared:
+  summary_shm_name: device_summary_data
+
+metadata:
+  workflow_kind: fastwam
+  policy_class: FastWAMPolicy
+  hardware_required: true
+  status: available
+  supported_by:
+    - control_panel
+    - direct
+  label: FastWAM memory native dual-arm
+  model_family: fastwam
+  model_variant: fastwam-memory
+
+camera:
+  left_capture_id: ${oc.env:SUPERINFERENCE_CAMERA_LEFT_CAPTURE_ID,1}
+  right_capture_id: ${oc.env:SUPERINFERENCE_CAMERA_RIGHT_CAPTURE_ID,3}
+
+global_settings:
+  log_level: INFO
+  restart_on_failure: false
+  max_restart_attempts: 0
+  restart_delay: 2.0
+
+hydra:
+  run:
+    dir: .
+  output_subdir: null
+  job_logging:
+    handlers:
+      file:
+        filename: ${hydra.runtime.cwd}/logs/${hydra.job.name}.log
+
+summary_shm: device_summary_data
+
+profiling:
+  mode: off
+  resources:
+    enabled: false
+  server:
+    output:
+      root: results/profiles
+      run_id: fastwam-server
+  client:
+    output:
+      root: results/profiles
+      run_id: fastwam-client
+
+policy:
+  class: FastWAMPolicy
+  params:
+    model_variant: fastwam-memory
+    # A valid root contains config.yaml, dataset_statistics.json, and weights.
+    ckpt_path: /home/syb/fastwam_ckpt/junlin_ckpt/fastwam_posttrain_gift_b1_1_s4_50k_4088_20260810/
+    task: "Place the gift into the box and cover the box with the lid"
+    condition_history_frames: 4
+    obs_horizon: 4
+    obs_time_interval: 0.03333333333333333
+    action_infer_mode: observed_frame_cache
+    action_video_attention_mode: first_frame
+    enforce_checkpoint_infer_mode: true
+    # Checkpoint metadata selects memory stride one or four.
+    host: 127.0.0.1
+    port: 18090
+    device: cuda
+    param_dtype: bf16
+    # Share the same Git-ignored Wan component cache as the other variants.
+    model_base_path: .superinference/local/model-cache
+    load_text_encoder: true
+    skip_pretrain_backbone_load: true
+    cache_prompt_embeddings: true
+    prompt_cache_max_entries: 8
+    torch_compile:
+      enabled: true
+      mode: reduce-overhead
+      dynamic: false
+      fullgraph: false
+    warm_up_on_load: true
+    warmup_requests: 3
+    max_abs_normalized_action: 5.0
+    crop_input_to_aspect: [3, 4]
+    camera_devices:
+      - "WebCameraOpenPi_0"
+      - "WebCameraOpenPi_1"
+    robot_device: RizonRobot_2
+    gripper_max_width: 0.0925319933860716
+    normalize_gripper_width: false
+    clip_gripper_width: true
+    enable_rtc: false
+    rtc_max_guidance_weight: 10.0
+    rtc_guidance_full_steps_override: null
+    rtc_delay_margin_steps: 0
+    rtc_use_vjp: false
+    reverse_temporal_chunks: false
+    execution_fps: ${policy.control_fps}
+    chunk_length: ${policy.chunk_length}
+  fps: 0.52
+  control_fps: 30.0
+  chunk_length: 48
+  obs:
+    devices:
+      - "WebCameraOpenPi_0"
+      - "WebCameraOpenPi_1"
+      - RizonRobot_2
+  controls:
+    - endpoint:
+        device: RizonRobot
+        device_class_id: 2
+        port: command
+      shape: [16]
+      dtype: float64
+  infer_rollout:
+    enabled: false
+    summary_shm_name: ${summary_shm}
+    output_dir: "data/rollout_data/fastwam_memory"
+    save_interval: 0.001
+    start_idx: 0
+    image_size: null
+    async_write: true
+    queue_size: 50000
+    robot_type: "Rizon"
+    task: ${policy.params.task}
+    ready_timeout: 10.0
+    auto_start: false
+    anomaly_config_path: "configs/anomaly_config/rizon_fisheye_umi3.yaml"
+    policy_outputs:
+      value:
+        name: "policy_value_estimation"
+        device_type: "PolicyValue"
+        buffer_size: 100
+        dtype: "float64"
+        enabled: false
+      q_value:
+        name: "policy_q_value_estimation"
+        device_type: "PolicyQValue"
+        buffer_size: 100
+        dtype: "float64"
+        enabled: false
+      q_value_timestamps:
+        name: "policy_q_value_timestamps"
+        device_type: "PolicyQValueTimestamps"
+        buffer_size: 100
+        dtype: "int64"
+        enabled: false
+      action_chunk:
+        name: "action_chunk"
+        device_type: "ActionChunk"
+        buffer_size: 200
+        dtype: "float64"
+        enabled: true
+    control_shms: ${policy.controls}
+    episode_control:
+      enabled: true
+      success_key: "s"
+      failure_key: "f"
+      discard_key: "d"
+      auto_restart: true
+      home_wait_time: 5.0
+  observation_recorder:
+    enabled: true
+    output_dir: logs/offline_observations/fastwam_memory
+    fps: 30.0
+    queue_size: 512
+    compress: false
+    superoffline_reviewed_source_profile: rizon-umi3-fisheye-openpi-rgb.v2
+    calibration_files:
+      tcp_to_umi: calibration/tcp_to_umi_transform.json
+      left_base_to_world: calibration/left_base_to_world.json
+      right_base_to_world: calibration/right_base_to_world.json
+      left_gripper: configs/devices/calibration/lktech_gripper/LKTech-Gripper-1_2_id1_calibration.json
+      right_gripper: configs/devices/calibration/lktech_gripper/LKTech-Gripper-2_2_id1_calibration.json

@@ -1,0 +1,26 @@
+# Terminal recorder profile for configs/i2rt_data_collect_async.yaml.
+output_dir: data/i2rt_nedf3
+# Robot joint-state sampling drives the recorder polling loop. Gripper and
+# camera topics are independently rate-limited below.
+sample_hz: 90.0
+gripper_sample_hz: 30.0
+camera_sample_hz: 30.0
+queue_size: 5000
+jpeg_quality: 90
+task: data_collection
+task_description: I2RT dual-arm teleoperation
+episode_signal_pattern: /tmp/superinference_episode_{signal}
+
+# The rig currently has no head camera. Keep the NEDF3 camera_2 contract by
+# writing black frames at the camera sample rate.
+synthetic_camera_shapes:
+  head: [480, 640, 3]
+
+devices:
+  leader: I2RTRobot_0_data
+  follower: I2RTRobot_1_data
+  cameras:
+    # NEDF3 camera_0=right wrist, camera_1=left wrist, camera_2=head.
+    right: WebCameraDevice_3_data
+    left: WebCameraDevice_2_data
+    head: null

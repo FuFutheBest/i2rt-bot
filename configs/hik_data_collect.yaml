@@ -1,0 +1,29 @@
+defaults:
+  - devices: hik_collect
+  - device_manager: sync
+  - consumer: default
+  - action_executor: default
+  - runtime: default
+  - _self_
+
+device_manager:
+  device_manager:
+    master_device_class_id: 0
+    params:
+      buffer_size: 100
+
+# Camera configuration - modify these to change camera IDs
+camera:
+  left_capture_id: 0
+  right_capture_id: 1
+
+global_settings:
+  log_level: "INFO"
+  restart_on_failure: true
+  max_restart_attempts: 3
+  restart_delay: 2.0
+
+hydra:
+  run:
+    dir: .
+  output_subdir: null

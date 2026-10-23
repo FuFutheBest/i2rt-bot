@@ -1,0 +1,4 @@
+interface:
+  display_name: "SuperInference CI"
+  short_description: "Repository review, test boundaries, and merge readiness"
+  default_prompt: "Use $superinference-ci to review this change and choose the correct merge-gate tests."

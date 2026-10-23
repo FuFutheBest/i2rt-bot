@@ -1,0 +1,83 @@
+# Rizon dual-arm EEF absolute control with iPhone UMI wrists.
+
+devices:
+  # - class: "RealSenseCamera"
+  #   device_class_id: 0 # camera left
+  #   data_shape: [480, 640, 3]
+  #   fps: 30.0
+  #   data_dtype: "uint8"
+  #   buffer_size: 200
+  #   realsense_serial: '135122079769'
+  #   hardware_latency_ms: 200.0
+- class: "IPhoneCameraDevice"
+  device_class_id: 0   # camera left
+  capture_id: ${camera.left_capture_id}
+  state_feedback:
+    fps: 30.0
+    buffer_size: 200
+    hardware_latency_ms: 200.0
+    format:
+      shape: [480, 640, 3]
+      dtype: "uint8"
+      type: rgb
+- class: "IPhoneCameraDevice"
+  device_class_id: 1   # camera right
+  capture_id: ${camera.right_capture_id}
+  state_feedback:
+    fps: 30.0
+    buffer_size: 200
+    hardware_latency_ms: 200.0
+    format:
+      shape: [480, 640, 3]
+      dtype: "uint8"
+      type: rgb
+- class: "RizonRobot"
+  device_class_id: 2
+  robot_sn: ["Rizon4-062931", "Rizon4-00044"]
+  state_feedback:
+    fps: 120.0
+    buffer_size: 100000
+    hardware_latency_ms: 10.0
+    format:
+      shape: [44]
+      dtype: "float64"
+        # Flattened order: left arm, then right arm. Each arm publishes joint
+        # position, joint velocity, TCP xyz, TCP quaternion (WXYZ), and gripper.
+      type: [j1-7, dq1-7, xyz, qwqxqyqz, gripper, j1-7, dq1-7, xyz, qwqxqyqz, gripper]
+  control:
+    type: eef_abs    # joints | eef_abs | eef_rel
+    execution:
+      mode: synchronous    # synchronous | legacy_async
+      fps: 100.0
+    buffer_size: 100
+    format:
+      shape: [16]
+      dtype: "float64"
+        # Per arm: absolute TCP xyz, TCP quaternion (XYZW), then gripper command.
+      type: [xyz, qxqyqzqw, gripper, xyz, qxqyqzqw, gripper]
+    cartesian_impedance:
+      translation_n_m: [10000.0, 10000.0, 10000.0]
+      rotation_nm_rad: [1500.0, 1500.0, 1500.0]
+  motion_limits:
+    velocity:
+      joints_rad_s:
+        left: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+        right: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+      tcp_linear_m_s: 1.0
+      tcp_angular_rad_s: 2.0
+    acceleration:
+      joints_rad_s2:
+        left: [2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0]
+        right: [2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0]
+      tcp_linear_m_s2: 2.0
+      tcp_angular_rad_s2: 5.0
+      # null disables the limit; otherwise [Fx, Fy, Fz, Mx, My, Mz] in N / N*m.
+    max_tcp_contact_wrench:
+  gripper:
+    backend: "flexiv"
+    name: "GripperDahuanModbus"
+    tool_name: "GripperDahuanModbusiPhone"
+  signal_files: ${runtime.signal_files}
+  home:
+    joints_left:
+    joints_right:

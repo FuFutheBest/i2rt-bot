@@ -1,0 +1,12 @@
+/home/jiulongdong/projects/datasets/0925_pick_two_dolls_v6:
+  lines: null
+  invalid_id: [1, 6, 11]
+  feat:
+    grip_left: "RotaryEncoderDevice_0"
+    grip_right: "RotaryEncoderDevice_1"
+    pose_unified: "ViveTrackerDevice_0"
+    img_left: "OpenCVCameraDevice_1"
+    img_right: "OpenCVCameraDevice_6"
+  masks:
+    mask_left: "/home/jiulongdong/projects/SuperInference/calibration/masks/umi/mapped/robot2center_left_centered.png"
+    mask_right: "/home/jiulongdong/projects/SuperInference/calibration/masks/umi/mapped/robot2center_right_centered.png"

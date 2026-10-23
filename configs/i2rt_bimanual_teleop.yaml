@@ -1,0 +1,75 @@
+version: 1
+episode_signal_pattern: /tmp/superinference_episode_{signal}
+
+control:
+  frequency_hz: 100.0
+  alignment_duration_s: 3.0
+  alignment_max_velocity_rad_s: 0.7
+  alignment_settle_timeout_s: 3.0
+  alignment_tolerance: 0.18
+  alignment_stable_samples: 3
+  startup_timeout_s: 20.0
+  rpc_timeout_s: 2.0
+  cycle_rpc_timeout_s: 0.10
+  command_frame_max_age_s: 0.05
+  command_lease_timeout_s: 0.15
+  feedback_timeout_s: 0.10
+  watchdog_check_interval_s: 0.005
+  following_error_fault_threshold: 1.0
+  following_error_fault_samples: 3
+  enter_chord_window_s: 0.30
+  button_debounce_samples: 3
+  bilateral_kp: 0.0
+  bilateral_kd: 0.0
+  leader_feedback: true
+
+arms:
+  left:
+    leader:
+      can_channel: can_leader_l
+      rpc_port: 1236
+    follower:
+      can_channel: can_follower_l
+      rpc_port: 1234
+      gripper:
+        # Select i2rt_can, lktech, or none. LKTech uses the serial and
+        # calibration fields below; verify port-to-side identity before use.
+        backend: lktech
+        type: linear_4310
+        port: /dev/ttyUSB0
+        motor_id: 1
+        calibration_file: configs/devices/calibration/lktech_gripper/LKTech-Gripper-1_2_id1_calibration.json
+        gripper_type: soft
+        speed_dps: 1000.0
+        command_velocity: 1.7
+        startup_width_ratio: 1.0
+        command_hz: 30.0
+        feedback_hz: 30.0
+        deadband: 0.002
+        scale_factor: 1.0
+        command_offset: 0.0
+        invert: false
+
+  right:
+    leader:
+      can_channel: can_leader_r
+      rpc_port: 1237
+    follower:
+      can_channel: can_follower_r
+      rpc_port: 1235
+      gripper:
+        backend: lktech
+        type: linear_4310
+        port: /dev/ttyUSB1
+        motor_id: 1
+        calibration_file: configs/devices/calibration/lktech_gripper/LKTech-Gripper-2_2_id1_calibration.json
+        gripper_type: soft
+        speed_dps: 1000.0
+        command_velocity: 1.7
+        startup_width_ratio: 1.0
+        command_hz: 30.0
+        feedback_hz: 30.0
+        deadband: 0.002
+        scale_factor: 1.0
+        command_offset: 0.0
+        invert: false

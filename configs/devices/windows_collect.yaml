@@ -1,0 +1,85 @@
+devices:
+- class: "HikCameraDevice"
+  device_class_id: 0   # left camera
+  capture_id: ${camera.left_capture_id}
+    # data_shape: [1440, 1080, 3]
+  state_feedback:
+    fps: 25.0
+    buffer_size: 200
+    hardware_latency_ms: 80.0
+    format:
+      shape: [360, 270, 3]
+      dtype: "uint8"
+      type: rgb
+  pixel_format: "RGB8"    # Pixel format (must be set first)
+  frame_rate_enable: true    # Enable frame rate control
+  exposure_time: 5000.0    # Exposure time in microseconds
+  gain: 16.9807    # Gain in dB
+  gamma_enable: true    # Enable gamma correction
+  gamma: 0.68    # Gamma value
+  rotation_angle: 90    # Rotate frame clockwise (supports 0/90/180/270)
+
+- class: "HikCameraDevice"
+  device_class_id: 1   # right camera
+  capture_id: ${camera.right_capture_id}
+    # data_shape: [1440, 1080, 3]
+  state_feedback:
+    fps: 25.0
+    buffer_size: 200
+    hardware_latency_ms: 80.0
+    format:
+      shape: [360, 270, 3]
+      dtype: "uint8"
+      type: rgb
+  pixel_format: "RGB8"    # Pixel format (must be set first)
+  frame_rate_enable: true    # Enable frame rate control
+  exposure_time: 5000.0    # Exposure time in microseconds
+  gain: 16.9807    # Gain in dB
+  gamma_enable: true    # Enable gamma correction
+  gamma: 0.68    # Gamma value
+  rotation_angle: 90    # Rotate frame clockwise (supports 0/90/180/270)
+
+
+
+- class: "RotaryEncoderDevice"
+  device_class_id: 2   # left gripper
+  state_feedback:
+    fps: 40.0
+    buffer_size: 100
+    hardware_latency_ms: 5.0    # Not currently used by data collection.
+    format:
+      shape: [1]
+      dtype: "float64"
+      type: [gripper]    # Calibrated gripper width in millimeters.
+  port: ${encoder.left_port}    # Serial port for encoder communication
+  baudrate: 57600       # 1MHz baudrate
+  calibration_file: "calibration/gripper_width_calibration_v2_left.csv"    # Calibration file path
+
+- class: "RotaryEncoderDevice"
+  device_class_id: 3   # right gripper
+  state_feedback:
+    fps: 40.0
+    buffer_size: 100
+    hardware_latency_ms: 5.0    # Not currently used by data collection.
+    format:
+      shape: [1]
+      dtype: "float64"
+      type: [gripper]    # Calibrated gripper width in millimeters.
+  port: ${encoder.right_port}    # Serial port for encoder communication
+  baudrate: 57600       # 1MHz baudrate
+  calibration_file: "calibration/gripper_width_calibration_v2_right.csv"    # Calibration file path
+
+
+
+- class: "ViveTrackerDevice"
+  device_class_id: 4   # unified umi tracker device
+  state_feedback:
+    fps: 90.0
+    buffer_size: 200
+    hardware_latency_ms: 20.0    # Not currently used by data collection.
+    format:
+      shape: [2, 7]
+      dtype: "float64"
+        # left_foot then right_foot, each xyz + quaternion XYZW.
+      type: [xyz, qxqyqzqw, xyz, qxqyqzqw]
+  tracker_roles: ['left_foot', 'right_foot']    # Roles for left and right UMI trackers

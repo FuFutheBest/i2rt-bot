@@ -1,0 +1,76 @@
+# NEDF3 (HAL) -> LeRobot v2.1 data-transfer config.
+#
+# Run (from repository root):
+#   python scripts/my_nedf3_to_lerobot.py --config configs/nedf3_to_lerobot.yaml
+#
+# Paths under ``dataset`` / ``gripper`` may be relative to the repo root
+# (parent of ``configs/``). A leading segment matching the repo folder name
+# (e.g. ``SuperInference/data/...``) is stripped when resolving.
+# ``gripper.module_root`` is required and must point at the directory that
+# contains ``detector.py``.
+
+latency:
+  # Constant delay per stream in milliseconds; subtracted from HAL log timestamps
+  # (nanoseconds) before vision gripper and alignment. Maps to LeRobot keys:
+  # wrist_cam_1 -> observation.images.wrist_image_1, etc.
+  wrist_cam_1: 0
+  wrist_cam_2: 0
+  global_cam: 0
+
+dataset:
+  data_dir: data\my_task      # Single demo with metadata.json, or parent of episode_* dirs
+  dataset_name: 0513_my_task            # Output LeRobot dataset name
+  output_dir: data/0513_my_task_lerobot                       # Where the converted dataset is written
+  task_desc: null                     # null -> read from reader.metadata.task_name
+  fps: 30
+  ee_dim: 1                           # Gripper angle dim (left/right only; my_nedf3_to_lerobot.py)
+  omit_ego_state_action: true         # If true, skip ego/head TCP in state/action (dual-arm only)
+
+cameras:
+  # Camera IDs. null means "auto-infer from the first demo's metadata".
+  wrist_cam_1: null
+  wrist_cam_2: null
+  global_cam: null
+  # Image sizes (height, width). One integer is treated as a square.
+  wrist_image_size: [270, 360]
+  global_image_size: [270, 360]
+
+selection:
+  num_demos: 0                        # 0 = all
+  num_subsets: 1                      # >1 -> spawn N subprocesses across demos
+  seed: 42                            # shuffle seed when num_subsets > 1
+
+gripper:
+  # Directory that contains ``detector.py`` (the ``gripper_process`` package root).
+  module_root: gripper_process
+
+  # ROI angle -> physical width (m). null -> ../nmx_vla/.../visual_angle_to_width.json
+  width_calibration_json: configs/visual_angle_to_width.json
+
+  # Per-arm vision-based gripper detection. masks_dir MUST be set for every
+  # arm that the LeRobot dataset will produce a gripper slot for, otherwise
+  # the converter raises. cfg_json is optional and may be either an inline
+  # JSON string or a path to a .json file; when null, uses the script's built-in
+  # default gripper-detection parameters (aligned with the standalone tool).
+  left:
+    camera: observation.images.wrist_image_1
+    masks_dir: output_masks/left
+    cfg_json: output_masks/offline_gripper_cfg.json
+  right:
+    camera: observation.images.wrist_image_2
+    masks_dir: output_masks/right
+    cfg_json: output_masks/offline_gripper_cfg.json
+
+# Tracker→TCP (T_E_K, row-major 4×4). Used when metadata.json umi_to_tcp_transform is [].
+# Order: left, then right (matches 32-float layout in the converter).
+umi_to_tcp_transform:
+  -  # left
+    - [-0.8703688373607834, 0.33999864270667396, 0.3561727248244273, -0.08254024805757579]
+    - [0.013582403061418946, -0.7064869391241801, 0.7075957342819584, -0.10512236643206652]
+    - [0.4922129674016268, 0.6207069580764873, 0.610286217210514, 0.0031525662716283265]
+    - [0.0, 0.0, 0.0, 1.0]
+  -  # right
+    - [0.8685570573971405, 0.3659820490279313, 0.33416429766648786, -0.0741883389602417]
+    - [-0.02066762065355504, 0.700439071017195, -0.7134128939464786, 0.1069734213581841]
+    - [-0.49515804295410665, 0.6127334229351991, 0.6159352765640018, 0.019827930842127698]
+    - [0.0, 0.0, 0.0, 1.0]

@@ -1,0 +1,34 @@
+defaults:
+  - devices: windows_collect_webcam
+  - device_manager: base
+  - consumer: default
+  - action_executor: default
+  - runtime: default
+  - _self_
+
+device_manager:
+  device_manager:
+    params:
+      buffer_size: 100
+
+# Camera configuration - modify these to change camera IDs
+camera:
+  left_capture_id: 0
+  right_capture_id: 1
+  ego_capture_id: 2
+
+# Encoder configuration - modify these to change encoder ports
+# encoder:
+#   left_port: "COM4"
+#   right_port: "COM5"
+
+global_settings:
+  log_level: "INFO"
+  restart_on_failure: true
+  max_restart_attempts: 3
+  restart_delay: 2.0
+
+hydra:
+  run:
+    dir: .
+  output_subdir: null

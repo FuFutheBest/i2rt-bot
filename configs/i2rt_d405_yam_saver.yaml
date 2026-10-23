@@ -1,0 +1,17 @@
+output_dir: data/i2rt_nedf3
+sample_hz: 90.0
+gripper_sample_hz: 30.0
+camera_sample_hz: 30.0
+queue_size: 5000
+jpeg_quality: 90
+task: data_collection
+task_description: I2RT dual-arm teleoperation
+episode_signal_pattern: /tmp/superinference_episode_{signal}
+
+devices:
+  leader: I2RTRobot_0_data
+  follower: I2RTRobot_1_data
+  cameras:
+    right: RealSenseCamera_3_data
+    left: RealSenseCamera_2_data
+    head: RealSenseCamera_4_data

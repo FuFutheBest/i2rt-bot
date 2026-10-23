@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="i2rt-csrf" content="{{ csrf_token }}">
+  <title>I2RT DM3 数据采集</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+  <script defer src="{{ url_for('static', filename='app.js') }}"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">I2</span>
+        <div>
+          <strong>I2RT DM3</strong>
+          <span>数据采集控制台</span>
+        </div>
+      </div>
+
+      <nav class="nav" aria-label="主要页面">
+        <button class="nav-item active" type="button" data-view="login-view">
+          <span class="nav-index">01</span><span>DM3 登录</span>
+        </button>
+        <button class="nav-item" type="button" data-view="collection-view" data-auth-required data-task-required>
+          <span class="nav-index">02</span><span>数据采集</span>
+        </button>
+        <button class="nav-item" type="button" data-view="upload-view" data-auth-required>
+          <span class="nav-index">03</span><span>上传与性能监控</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-status">
+        <span id="server-dot" class="status-dot neutral"></span>
+        <div><strong id="server-status">连接中</strong><span>本机服务</span></div>
+      </div>
+    </aside>
+
+    <main class="workspace">
+      <header class="topbar">
+        <div>
+          <span class="eyebrow" id="page-eyebrow">SESSION</span>
+          <h1 id="page-title">DM3 登录</h1>
+        </div>
+        <div class="operator-block">
+          <span id="operator-label">未登录</span>
+          <button id="logout-button" class="button quiet" type="button" disabled>退出</button>
+        </div>
+      </header>
+
+      <div id="alert-region" class="alert-region" role="status" aria-live="polite"></div>
+
+      <section id="login-view" class="view active" aria-labelledby="page-title">
+        <div class="section-heading">
+          <div><h2>账户</h2><p id="dm3-endpoint">{{ dm3_base_url }}</p></div>
+          <span id="login-badge" class="badge neutral">未登录</span>
+        </div>
+        <form id="login-form" class="form-grid login-form">
+          <label>手机号<input id="phone-input" name="phone" autocomplete="username" required></label>
+          <label>密码<input id="password-input" name="password" type="password" autocomplete="current-password" required></label>
+          <button id="login-button" class="button primary" type="submit">登录 DM3</button>
+        </form>
+
+        <div class="divider"></div>
+
+        <div class="section-heading">
+          <div><h2>我的任务</h2><p id="selected-task-label">未选择任务</p></div>
+          <button id="select-task-button" class="button primary" type="button" disabled>选择任务</button>
+        </div>
+        <form id="task-filter-form" class="toolbar">
+          <label>执行日期<input id="execute-day-input" type="date"></label>
+          <label>页码<input id="page-input" type="number" min="1" value="1"></label>
+          <label>每页<input id="page-size-input" type="number" min="1" max="100" value="10"></label>
+          <button id="fetch-task-button" class="button secondary" type="submit" disabled>获取任务</button>
+        </form>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>执行 ID</th><th>状态</th><th>任务名称</th></tr></thead>
+            <tbody id="task-table-body"><tr><td colspan="3" class="empty">登录后获取任务</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="collection-view" class="view" aria-labelledby="page-title">
+        <div class="metric-strip">
+          <div><span>设备</span><strong id="device-metric">停止</strong></div>
+          <div><span>遥操作</span><strong id="teleoperation-metric">停止</strong></div>
+          <div><span>保存</span><strong id="saver-metric">停止</strong></div>
+          <div><span>Episode</span><strong id="episode-count">0</strong></div>
+          <div><span>最近保存</span><strong id="last-episode">—</strong></div>
+        </div>
+
+        <div class="context-band">
+          <div><span>当前任务</span><strong id="collection-task">未选择</strong></div>
+          <div><span>输出目录</span><code id="output-dir">—</code></div>
+        </div>
+
+        <div class="teleoperation-band">
+          <div><span>TELEOPERATION</span><strong>I2RT 双臂控制</strong></div>
+          <span id="teleoperation-badge" class="badge neutral">停止</span>
+        </div>
+        <div id="teleoperation-fault" class="fault-band" role="alert" hidden>
+          <strong>遥操作故障</strong><span id="teleoperation-fault-reason"></span>
+        </div>
+
+        <section class="camera-monitor" aria-labelledby="camera-monitor-title">
+          <div class="section-heading compact">
+            <div><h2 id="camera-monitor-title">相机监看</h2><p>录制画面预览</p></div>
+            <span id="camera-monitor-badge" class="badge neutral">离线</span>
+          </div>
+          <div class="camera-grid">
+            <figure class="camera-feed" data-camera-role="right">
+              <div class="camera-viewport">
+                <img id="camera-right-image" alt="右腕相机实时画面">
+                <span class="camera-placeholder">等待设备画面</span>
+              </div>
+              <figcaption><strong>右腕相机</strong><span id="camera-right-status">离线</span></figcaption>
+            </figure>
+            <figure class="camera-feed" data-camera-role="left">
+              <div class="camera-viewport">
+                <img id="camera-left-image" alt="左腕相机实时画面">
+                <span class="camera-placeholder">等待设备画面</span>
+              </div>
+              <figcaption><strong>左腕相机</strong><span id="camera-left-status">离线</span></figcaption>
+            </figure>
+            <figure class="camera-feed{% if not head_camera_configured %} synthetic{% endif %}" data-camera-role="head">
+              <div class="camera-viewport">
+                <img id="camera-head-image" alt="头部相机实时画面">
+                <span class="camera-placeholder">{% if head_camera_configured %}等待设备画面{% else %}未配置头部相机{% endif %}</span>
+              </div>
+              <figcaption><strong>头部相机</strong><span id="camera-head-status">{% if head_camera_configured %}离线{% else %}占位{% endif %}</span></figcaption>
+            </figure>
+          </div>
+        </section>
+
+        <section class="hardware-panel" aria-labelledby="hardware-profile-title">
+          <div class="section-heading compact">
+            <div><h2 id="hardware-profile-title">设备方案</h2><p id="hardware-binding-status">尚未读取本机硬件</p></div>
+            <div class="button-row">
+              <button id="refresh-hardware-button" class="button quiet" type="button" disabled>重新枚举</button>
+              <button id="save-hardware-button" class="button secondary" type="button" disabled>保存本机配置</button>
+            </div>
+          </div>
+          <div class="hardware-grid">
+            <label>系统配置<select id="system-profile-select" disabled></select></label>
+            <div id="hardware-fields" class="hardware-fields"></div>
+          </div>
+        </section>
+
+        <div class="control-grid">
+          <section class="control-section">
+            <div class="section-heading compact">
+              <div><h2>I2RT 双臂与相机</h2><p id="device-config">—</p></div>
+              <span id="device-badge" class="badge neutral">停止</span>
+            </div>
+            <div class="button-row">
+              <button id="start-device-button" class="button primary" type="button" disabled>启动设备</button>
+              <button id="stop-device-button" class="button danger" type="button" disabled>停止设备</button>
+            </div>
+          </section>
+          <section class="control-section">
+            <div class="section-heading compact">
+              <div><h2>NEDF3 保存</h2><p id="saver-config">—</p></div>
+              <span id="saver-badge" class="badge neutral">停止</span>
+            </div>
+            <div class="button-row">
+              <button id="start-saver-button" class="button primary" type="button" disabled>启动保存</button>
+              <button id="stop-saver-button" class="button danger" type="button" disabled>停止保存</button>
+            </div>
+          </section>
+          <section id="calibration-control" class="control-section">
+            <div class="section-heading compact">
+              <div><h2>夹爪标定</h2><p>设备和保存进程停止后执行</p></div>
+              <span id="calibration-badge" class="badge neutral">停止</span>
+            </div>
+            <div class="button-row">
+              <button id="calibrate-grippers-button" class="button secondary" type="button" disabled>标定左右夹爪</button>
+            </div>
+          </section>
+        </div>
+
+        <div class="episode-bar">
+          <div><span>EPISODE CONTROL</span><strong id="episode-status">保存进程未运行</strong></div>
+          <div class="button-row">
+            <button id="toggle-episode-button" class="button record" type="button" disabled>网页开始 Episode</button>
+            <button id="discard-episode-button" class="button danger" type="button" disabled>网页丢弃 Episode</button>
+            <button id="visualize-episode-button" class="button secondary" type="button" disabled>选择 Episode 并用 Rerun 打开</button>
+          </div>
+        </div>
+
+        <div class="log-grid">
+          <section class="log-section"><div class="log-title"><h2>设备输出</h2><button class="text-button" type="button" data-clear-log="device-log">清空</button></div><pre id="device-log"></pre></section>
+          <section class="log-section"><div class="log-title"><h2>保存输出</h2><button class="text-button" type="button" data-clear-log="saver-log">清空</button></div><pre id="saver-log"></pre></section>
+          <section id="calibration-log-section" class="log-section"><div class="log-title"><h2>夹爪标定输出</h2><button class="text-button" type="button" data-clear-log="calibration-log">清空</button></div><pre id="calibration-log"></pre></section>
+        </div>
+      </section>
+
+      <dialog id="episode-picker-dialog" class="episode-picker" aria-labelledby="episode-picker-title">
+        <form method="dialog" class="episode-picker-shell">
+          <div class="episode-picker-header">
+            <div><span>RERUN</span><h2 id="episode-picker-title">选择 Episode 文件夹</h2></div>
+            <button class="text-button" type="submit" value="cancel">关闭</button>
+          </div>
+          <div class="episode-picker-fields">
+            <label>任务文件夹<select id="rerun-task-select"></select></label>
+            <label>Episode 文件夹<select id="rerun-episode-select" size="10"></select></label>
+          </div>
+          <p id="rerun-episode-path" class="episode-picker-path">—</p>
+          <div class="episode-picker-actions">
+            <button class="button quiet" type="submit" value="cancel">取消</button>
+            <button id="open-rerun-button" class="button primary" type="button" disabled>在 Rerun 中打开</button>
+          </div>
+        </form>
+      </dialog>
+
+      <section id="upload-view" class="view" aria-labelledby="page-title">
+        <div class="metric-strip upload-metrics">
+          <div><span>待上传</span><strong id="upload-queued">0</strong></div>
+          <div><span>成功</span><strong id="upload-success">0</strong></div>
+          <div><span>失败</span><strong id="upload-failed">0</strong></div>
+          <div><span>CPU / 内存</span><strong id="performance-metric">0% / 0%</strong></div>
+        </div>
+
+        <div class="section-heading">
+          <div><h2>上传控制</h2><p><code id="upload-data-dir">—</code></p></div>
+          <label class="switch"><input id="auto-upload-toggle" type="checkbox"><span></span><em>自动上传</em></label>
+        </div>
+        <div class="upload-actions">
+          <button id="refresh-upload-button" class="button secondary" type="button">刷新扫描</button>
+          <button id="enqueue-eligible-button" class="button primary" type="button">上传符合条件项</button>
+          <button id="retry-failed-button" class="button secondary" type="button">重试失败项</button>
+          <button id="enqueue-all-button" class="button danger" type="button">确认全部上传</button>
+        </div>
+
+        <form id="upload-settings-form" class="settings-grid">
+          <label>保护分钟<input id="protect-minutes-input" type="number" min="0" max="1440"></label>
+          <label>保留最新条数<input id="keep-latest-input" type="number" min="0" max="1000"></label>
+          <label>最大重试<input id="max-retries-input" type="number" min="0" max="20"></label>
+          <label>上传线程<input id="upload-workers-input" type="number" min="1" max="16"></label>
+          <label>分片线程<input id="multipart-threads-input" type="number" min="1" max="32"></label>
+          <label>resource_type<input value="i2rt" readonly aria-label="resource type i2rt"></label>
+          <button class="button secondary" type="submit">保存设置</button>
+        </form>
+
+        <div id="upload-progress-wrap" class="progress-band" hidden>
+          <div><span id="upload-progress-name">—</span><strong id="upload-progress-label">0%</strong></div>
+          <progress id="upload-progress" max="100" value="0"></progress>
+        </div>
+
+        <div class="section-heading compact"><div><h2>Episode 队列</h2><p id="upload-summary">0 条记录</p></div></div>
+        <div class="table-wrap upload-table-wrap">
+          <table>
+            <thead><tr><th>Episode</th><th>任务</th><th>状态</th><th>大小</th><th>进度 / 原因</th></tr></thead>
+            <tbody id="upload-table-body"><tr><td colspan="5" class="empty">暂无记录</td></tr></tbody>
+          </table>
+        </div>
+
+        <section class="log-section upload-log-section">
+          <div class="log-title"><h2>上传日志</h2><button class="text-button" type="button" data-clear-log="upload-log">清空</button></div>
+          <pre id="upload-log"></pre>
+        </section>
+      </section>
+    </main>
+  </div>
+  <div id="operation-status" class="operation-status" role="status" aria-live="polite" aria-atomic="true" hidden>
+    <strong id="operation-status-label"></strong>
+  </div>
+</body>
+</html>

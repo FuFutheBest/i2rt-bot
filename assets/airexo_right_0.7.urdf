@@ -1,0 +1,150 @@
+<?xml version="1.0"?>
+<robot name="right_arm_robot_0.7">
+  <!-- Root link -->
+  <link name="world"/>
+
+  <!-- Right Arm Base Link -->
+  <link name="r_base_link1">
+    <visual>
+      <geometry>
+        <box size="0.1 0.1 0.1"/>
+      </geometry>
+    </visual>
+  </link>
+
+  <!-- Connect directly to world (origin set to 0 as requested) --> 
+  <joint name="r_world_to_base" type="fixed">
+    <parent link="world"/>
+    <child link="r_base_link1"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Right Arm Links and Joints based on Rizon_urdf_0.7.urdf -->
+  <link name="r_link1">
+    <visual>
+      <geometry>
+        <box size="0.1 0.1 0.211"/>
+      </geometry>
+    </visual>
+  </link>
+
+  <joint name="r_joint1" type="revolute">
+    <origin xyz="0 0 0.1085" rpy="-3.1416 0 -3.1416"/>
+    <parent link="r_base_link1"/>
+    <child link="r_link1"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="0.01" velocity="1" lower="-2.7925" upper="2.7925"/>
+  </joint>
+
+  <link name="r_link2">
+    <visual>
+      <geometry>
+        <box size="0.1 0.1 0.1"/>
+      </geometry>
+    </visual>
+  </link>
+
+  <joint name="r_joint2" type="revolute">
+    <origin xyz="0 0.021 -0.147" rpy="0 0 3.1416"/>
+    <parent link="r_link1"/>
+    <child link="r_link2"/>
+    <axis xyz="0 1 0"/>
+    <limit effort="0.01" velocity="1" lower="-2.2689" upper="2.2689"/>
+  </joint>
+
+  <link name="r_link3">
+    <visual>
+      <geometry>
+        <box size="0.1 0.1 0.142"/>
+      </geometry>
+    </visual>
+  </link>
+
+  <joint name="r_joint3" type="revolute">
+    <origin xyz="0 -0.0245 -0.1435" rpy="0 0 -3.1416"/>
+    <parent link="r_link2"/>
+    <child link="r_link3"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="0.01" velocity="1" lower="-2.9671" upper="2.9671"/>
+  </joint>
+
+  <link name="r_link4">
+    <visual>
+      <geometry>
+        <box size="0.1 0.1 0.1"/>
+      </geometry>
+    </visual>
+  </link>
+
+  <joint name="r_joint4" type="revolute">
+    <origin xyz="-0.014 -0.021 -0.133" rpy="0 0 0"/>
+    <parent link="r_link3"/>
+    <child link="r_link4"/>
+    <axis xyz="0 1 0"/>
+    <limit effort="0.01" velocity="1" lower="-2.9671" upper="2.9671"/>
+  </joint>
+
+  <link name="r_link5">
+    <visual>
+      <geometry>
+        <box size="0.1 0.1 0.142"/>
+      </geometry>
+    </visual>
+  </link>
+
+  <joint name="r_joint5" type="revolute">
+    <origin xyz="0.014 -0.0175 -0.1365" rpy="0 0 0"/>
+    <parent link="r_link4"/>
+    <child link="r_link5"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="0.01" velocity="1" lower="-2.9671" upper="2.9671"/>
+  </joint>
+
+  <link name="r_link6">
+    <visual>
+      <geometry>
+        <box size="0.1 0.1 0.1"/>
+      </geometry>
+    </visual>
+  </link>
+
+  <joint name="r_joint6" type="revolute">
+    <origin xyz="0 0.021 -0.133" rpy="0 0 -3.1416"/>
+    <parent link="r_link5"/>
+    <child link="r_link6"/>
+    <axis xyz="0 1 0"/>
+    <limit effort="0.01" velocity="1" lower="-2.9671" upper="2.9671"/>
+  </joint>
+
+  <link name="r_link7">
+    <visual>
+      <geometry>
+        <box size="0.1 0.1 0.142"/>
+      </geometry>
+    </visual>
+  </link>
+
+  <joint name="r_joint7" type="revolute">
+    <origin xyz="0.0105 -0.0511 -0.077" rpy="0 -1.5708 0"/>
+    <parent link="r_link6"/>
+    <child link="r_link7"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="0.01" velocity="1" lower="-2.9671" upper="2.9671"/>
+  </joint>
+
+  <!-- End effector link -->
+  <link name="r_end_effector">
+    <visual>
+      <geometry>
+        <box size="0.05 0.05 0.05"/>
+      </geometry>
+    </visual>
+  </link>
+
+  <joint name="r_joint_end" type="fixed">
+    <origin xyz="0 0 0.071" rpy="0 0 0"/>
+    <parent link="r_link7"/>
+    <child link="r_end_effector"/>
+  </joint>
+
+</robot>

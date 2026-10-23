@@ -1,0 +1,113 @@
+# @package _global_
+
+defaults:
+  - /devices/infer@devices: rizon_single_eef_abs_iphone_umi
+  - /device_manager: sync
+  - /action_executor: base
+  - /consumer: default
+  - /runtime: default
+  - _self_
+
+camera:
+  left_capture_id: 0
+
+device_manager:
+  device_manager:
+    master_device_class_id: 1
+    params:
+      buffer_size: 100000
+
+shared:
+  summary_shm_name: device_summary_data
+
+global_settings:
+  log_level: INFO
+  restart_on_failure: true
+  max_restart_attempts: 3
+  restart_delay: 2.0
+
+hydra:
+  run:
+    dir: .
+  output_subdir: null
+
+summary_shm: device_summary_data
+
+policy:
+  class: LingBotVAPolicy
+  params:
+    # Supports:
+    # 1) /path/to/run_dir                     (auto pick latest checkpoint_step_xxx)
+    # 2) /path/to/checkpoint_step_xxx
+    # 3) /path/to/checkpoint_step_xxx/transformer
+    # ckpt_path: "/home/noematrix/ckpt/lingbotva_fastwam_mot_stack_bowl"
+    # ckpt_path: "/home/noematrix/ckpt/lingbotva_fastwam_shared_stack_bowl"
+    # ckpt_path: "/home/noematrix/ckpt/lingbotva_idm_mot_stack_bowl"
+    ckpt_path: "/home/noematrix/ckpt/lingbotva_idm_shared_stack_bowl"
+    # base_model_path: "/home/noematrix/ckpt/lingbotva_third_party/models--robbyant--lingbot-va-base"
+
+    # Optional: auto-discovered from ckpt_path if omitted.
+    # runtime_config_path: "/home/noematrix/ckpt/nmxvla_lingbotva_fastwam_stack_bowl/lingbot_runtime_config.json"
+    # nmx_vla_config_path: "/home/noematrix/ckpt/nmxvla_lingbotva_fastwam_stack_bowl/nmx_vla_config.yaml"
+    # norm_stat_path: "/home/noematrix/ckpt/nmxvla_lingbotva_fastwam_stack_bowl/lingbot_action_norm_stats.json"
+
+    # Start server separately:
+    # python -m consumer.inference.lingbot_va_server --config configs/policy_infer/lingbotva/config_infer_iphone_umi_single_lingbotva.yaml
+    host: "127.0.0.1"
+    port: 18080
+
+    task: "叠碗"
+    device: "cuda"
+    camera_devices:
+      - "IPhoneCameraDevice_0"
+    # Camera keys expected by LingBot-VA runtime config/training dataset.
+    model_camera_keys:
+      - "observation.images.wrist_image_1"
+    robot_device: "RizonRobot_1"
+
+    param_dtype: "bf16"
+    # attn_mode: "torch"
+    attn_mode: "flashattn"
+    enable_offload: false
+    offload_vae: false
+    offload_text_encoder: true
+    stateless_reset_each_predict: false
+    skip_first_frame: false
+    # action_reference_state: "initial"
+    action_reference_state: "current"
+    rot_type: "xyzw"
+    block: true
+
+    frame_chunk_size: 4
+    attn_window: 30
+    guidance_scale: 5.0
+    action_guidance_scale: 1.0
+    num_inference_steps: 25
+    # num_inference_steps: 0
+    action_num_inference_steps: 50
+    # action_num_inference_steps: 10
+    save_root: "/home/noematrix/code/SuperInference.lingbotva/logs/runs"
+    save_predicted_video_latents: true
+    save_history_cache_latents: true
+    decoded_latent_save_dir: "/home/noematrix/code/SuperInference.lingbotva/logs/decoded_lingbot_latents"
+
+  fps: 1.25
+  control_fps: 10.0
+  chunk_length: 16
+
+  obs:
+    devices:
+      - "IPhoneCameraDevice_0"
+      - "RizonRobot_1"
+
+  controls:
+    - endpoint:
+        device: RizonRobot
+        device_class_id: 1
+        port: command
+      shape: [8]
+      dtype: "float64"
+
+  history_video:
+    enabled: true
+    save_dir: "/home/noematrix/code/SuperInference.lingbotva/logs/history_keyframes"

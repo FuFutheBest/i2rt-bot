@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>UMI3 视觉验收</title>
+    <link rel="stylesheet" href="/static/device_control.css">
+    <style>
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        background: #050505;
+      }
+
+      .qa-shell {
+        display: grid;
+        width: 100%;
+        height: 100%;
+        grid-template-rows: auto minmax(0, 1fr);
+      }
+
+      .qa-toolbar {
+        display: flex;
+        z-index: 5;
+        min-width: 0;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--border);
+        background: #090909;
+      }
+
+      .qa-toolbar h1 {
+        margin: 0;
+        color: var(--text);
+        font-size: 14px;
+        letter-spacing: 0;
+      }
+
+      .qa-pose-control {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .qa-pose-control button {
+        min-height: 28px;
+        padding: 4px 9px;
+        border: 1px solid var(--border-strong);
+        border-radius: 5px;
+        background: #090909;
+        color: var(--muted-strong);
+        cursor: pointer;
+      }
+
+      .qa-pose-control button[aria-pressed="true"] {
+        border-color: #fff;
+        background: #f4f4f5;
+        color: #050505;
+        font-weight: 700;
+      }
+
+      .qa-viewer-stage {
+        position: relative;
+        min-width: 0;
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      .qa-viewer-stage > .arm-viewer-root {
+        width: 100%;
+        height: 100%;
+      }
+
+      @media (max-width: 620px) {
+        .qa-toolbar {
+          align-items: flex-start;
+          flex-direction: column;
+          gap: 6px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="qa-shell">
+      <header class="qa-toolbar">
+        <h1>UMI3 双臂末端视觉验收</h1>
+        <div class="qa-pose-control" role="group" aria-label="夹爪开合姿态">
+          <button type="button" data-qa-pose="closed" aria-pressed="false">闭合</button>
+          <button type="button" data-qa-pose="open" aria-pressed="true">张开</button>
+        </div>
+      </header>
+      <div class="qa-viewer-stage" id="qa-viewer-stage">
+        <div class="tool-variant-control tool-variant-control--viewer" id="tool-variant-control" data-available="false">
+          <span class="tool-variant-control__label">夹爪模型</span>
+          <div class="tool-variant-segmented" role="group" aria-label="切换双臂夹爪模型">
+            <button type="button" data-tool-visual-variant="soft" aria-pressed="true" disabled>软指夹爪</button>
+            <button type="button" data-tool-visual-variant="hard" aria-pressed="false" disabled>硬指夹爪</button>
+          </div>
+        </div>
+      </div>
+    </main>
+    <script type="module">
+      import * as THREE from "/static/vendor/three.module.min.js";
+      const { DualArmViewer } = await import("/static/arm_viewer.js");
+
+      const stage = document.getElementById("qa-viewer-stage");
+      const root = document.createElement("div");
+      root.id = "arm-viewer-root";
+      root.className = "arm-viewer-root";
+      stage.prepend(root);
+
+      const viewer = new DualArmViewer(root, {
+        robotStateUrl: null,
+        homePoseCandidatesUrl: null,
+        toolVisualVariant: "soft",
+      });
+      window.__dualArmViewer = viewer;
+
+      const mountTransform = {
+        frame: "flange",
+        translation: [0, 0, 0],
+        quaternion: [1, 0, 0, 0],
+        quaternion_order: "wxyz",
+      };
+      const articulation = {
+        joint_name: "gripper_joint",
+        joint_lower_rad: 0,
+        joint_upper_rad: Math.PI / 2,
+        closed_joint_rad: 0,
+        value_mode: "width_m",
+        arm_length_m: 0.06543,
+        max_width_m: 0.0925319933860716,
+        apex_angle_max_deg: 90,
+      };
+      const variants = {
+        soft: { kind: "urdf", url: "/static/assets/tools/umi3_camera/soft/umi3_gripper.urdf" },
+        hard: { kind: "urdf", url: "/static/assets/tools/umi3_camera/hard/umi3_gripper.urdf" },
+      };
+      const configuredTool = (side) => ({
+        status: "not-configured",
+        transform: null,
+        visual: {
+          model: "umi3",
+          status: "available",
+          kind: "urdf",
+          url: variants.soft.url,
+          default_variant: "soft",
+          variants,
+          mirror_axis: side === "left" ? "y" : null,
+          mount_transform: mountTransform,
+          articulation,
+        },
+      });
+      viewer.updateConfiguredTools(configuredTool("left"), configuredTool("right"));
+
+      let selectedPose = "open";
+      let renderedSignature = "";
+
+      function setPose(pose) {
+        selectedPose = pose;
+        const actualPercent = pose === "closed" ? 0 : 100;
+        viewer.updateGripperPositions({
+          left: { known: true, actual_percent: actualPercent, source: "visual-qa" },
+          right: { known: true, actual_percent: actualPercent, source: "visual-qa" },
+        });
+        document.querySelectorAll("[data-qa-pose]").forEach((button) => {
+          button.setAttribute("aria-pressed", button.dataset.qaPose === pose ? "true" : "false");
+        });
+      }
+
+      const qaToolGroup = new THREE.Group();
+      qaToolGroup.name = "visual-qa-tools";
+      viewer.sceneRoot.add(qaToolGroup);
+
+      function rebuildToolDisplay() {
+        qaToolGroup.clear();
+        for (const side of ["left", "right"]) {
+          const mounted = viewer.toolAssetObjects[side];
+          if (!mounted) return false;
+          const clone = mounted.clone(true);
+          clone.name = `visual-qa-${side}-${viewer.toolVisualVariant}`;
+          clone.position.set(side === "left" ? -0.18 : 0.18, 0, 0.12);
+          clone.quaternion.setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI);
+          qaToolGroup.add(clone);
+        }
+        viewer.arms.left.root.visible = false;
+        viewer.arms.right.root.visible = false;
+        viewer.floor.visible = false;
+        viewer.grid.visible = false;
+        viewer.worldFrame.visible = false;
+        viewer.recordedTcpTrajectoryRoot.visible = false;
+        return true;
+      }
+
+      function frameTools() {
+        const bounds = new THREE.Box3();
+        bounds.expandByObject(qaToolGroup);
+        if (bounds.isEmpty()) return false;
+        const center = bounds.getCenter(new THREE.Vector3());
+        const size = bounds.getSize(new THREE.Vector3());
+        const halfFov = THREE.MathUtils.degToRad(viewer.camera.fov * 0.5);
+        const fitHeight = size.z / (2 * Math.tan(halfFov));
+        const fitWidth = size.x / (2 * Math.tan(halfFov) * viewer.camera.aspect);
+        const distance = Math.max(fitHeight, fitWidth) * 1.35 + size.y * 0.5;
+        const direction = new THREE.Vector3(0, -1, 0.32).normalize();
+        viewer.camera.position.copy(center).addScaledVector(direction, distance);
+        viewer.camera.lookAt(center);
+        const damping = viewer.controls.enableDamping;
+        viewer.controls.enableDamping = false;
+        viewer.controls.target.copy(center);
+        viewer.controls.update();
+        viewer.controls.enableDamping = damping;
+        viewer._invalidateRender("visual-qa-frame-tools");
+        return true;
+      }
+
+      document.querySelectorAll("[data-qa-pose]").forEach((button) => {
+        button.addEventListener("click", () => setPose(button.dataset.qaPose));
+      });
+      setPose("open");
+
+      const readyTimer = window.setInterval(() => {
+        const ready = ["left", "right"].every(
+          (side) => viewer.toolAssetStates[side]?.status === "ready",
+        );
+        const signature = `${viewer.toolVisualVariant}:${selectedPose}:${["left", "right"].map(
+          (side) => viewer.toolAssetStates[side]?.url || "",
+        ).join("|")}`;
+        if (!ready || signature === renderedSignature) return;
+        if (!rebuildToolDisplay() || !frameTools()) return;
+        renderedSignature = signature;
+        document.body.dataset.qaReady = "true";
+        document.body.dataset.qaVariant = viewer.toolVisualVariant;
+        document.body.dataset.qaPose = selectedPose;
+      }, 50);
+    </script>
+  </body>
+</html>

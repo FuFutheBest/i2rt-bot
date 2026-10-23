@@ -1,0 +1,98 @@
+devices:
+- class: RoboTwinSimRobot
+  device_class_id: 0
+  state_feedback:
+    fps: ${robotwin.state_fps}
+    buffer_size: 300
+    hardware_latency_ms: 0.0
+    format:
+      shape: [14]
+      dtype: float64
+      type: [j1-7, j1-7]    # Left arm then right arm measured positions.
+  control:
+    type: ${robotwin.control.type}    # joints | eef_abs | eef_rel
+    buffer_size: 256
+    execution:
+      mode: synchronous
+      fps: ${robotwin.control_fps}
+      # Selected top-level config supplies one complete mapping: joint14 is
+      # [left j1-7, right j1-7]; eef16 is two [xyz, XYZW quaternion, gripper].
+    format: ${robotwin.control.format}
+  physics_fps: ${robotwin.physics_fps}
+  physics_sleep_spin_margin_s: ${robotwin.physics_sleep_spin_margin_s}
+  max_catch_up_steps: ${robotwin.max_catch_up_steps}
+  robotwin_root: ${robotwin.root}
+  task_name: ${robotwin.task_name}
+  task_config: ${robotwin.task_config}
+  seed: ${robotwin.seed}
+  enable_gui: ${robotwin.enable_gui}
+  gui_render_fps: ${robotwin.gui_render_fps}
+  renderer_shader_dir: ${robotwin.renderer_shader_dir}
+  viewer_shader_dir: ${robotwin.viewer_shader_dir}
+  viewer_resolution: ${robotwin.viewer_resolution}
+  renderer_max_num_materials: ${robotwin.renderer_max_num_materials}
+  renderer_max_num_textures: ${robotwin.renderer_max_num_textures}
+  joint_stiffness: ${robotwin.joint_stiffness}
+  joint_damping: ${robotwin.joint_damping}
+  gripper_stiffness: ${robotwin.gripper_stiffness}
+  gripper_damping: ${robotwin.gripper_damping}
+  eef_resolver: ${robotwin.eef_resolver}
+  trace_log_dir: ${robotwin.trace_log_dir}
+  trace_visualizer: ${robotwin.trace_visualizer}
+  trace_timing_interval_s: ${robotwin.trace_timing_interval_s}
+  realtime_factor_warn_threshold: ${robotwin.realtime_factor_warn_threshold}
+  camera_streams:
+  - camera_name: head_camera
+    device_class_id: 1
+        # demo_clean uses RoboTwin's D435 profile: H=240, W=320. The ACT
+        # adapter performs the official 640x480 resize before inference.
+    data_shape: [240, 320, 3]
+    fps: ${robotwin.camera_fps}
+    buffer_size: 300
+  - camera_name: left_camera
+    device_class_id: 2
+    data_shape: [240, 320, 3]
+    fps: ${robotwin.camera_fps}
+    buffer_size: 300
+  - camera_name: right_camera
+    device_class_id: 3
+    data_shape: [240, 320, 3]
+    fps: ${robotwin.camera_fps}
+    buffer_size: 300
+
+  # These streams are created by the single RoboTwinSimRobot process.  The
+  # DeviceManager still lists them as normal inputs, while DeviceStarter skips
+  # their process creation because managed_by is set.
+- class: RoboTwinCamera
+  device_class_id: 1
+  state_feedback:
+    fps: ${robotwin.camera_fps}
+    buffer_size: 300
+    hardware_latency_ms: 0.0
+    format:
+      shape: [240, 320, 3]
+      dtype: uint8
+      type: rgb
+  managed_by: RoboTwinSimRobot_0
+- class: RoboTwinCamera
+  device_class_id: 2
+  state_feedback:
+    fps: ${robotwin.camera_fps}
+    buffer_size: 300
+    hardware_latency_ms: 0.0
+    format:
+      shape: [240, 320, 3]
+      dtype: uint8
+      type: rgb
+  managed_by: RoboTwinSimRobot_0
+- class: RoboTwinCamera
+  device_class_id: 3
+  state_feedback:
+    fps: ${robotwin.camera_fps}
+    buffer_size: 300
+    hardware_latency_ms: 0.0
+    format:
+      shape: [240, 320, 3]
+      dtype: uint8
+      type: rgb
+  managed_by: RoboTwinSimRobot_0

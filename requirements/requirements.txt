@@ -1,0 +1,11 @@
+# Hardware-free runtime dependencies shared by every install profile.
+numpy
+scipy
+omegaconf
+hydra-core
+pyyaml
+loguru
+psutil
+requests
+rerun-sdk
+pydantic

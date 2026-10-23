@@ -1,0 +1,35 @@
+# Top-level config to REPLAY a recorded R1 NEDF3 episode onto the real robot.
+# Launch:  python device_starter.py --config-path configs --config-name quest3_replay_r1
+#
+# Override the episode / pacing on the CLI, e.g.:
+#   python device_starter.py --config-name quest3_replay_r1 \
+#       devices.devices.0.episode=saved_data/episode_0003 \
+#       devices.devices.0.speed=0.5 devices.devices.0.loop=true
+#
+# SAFETY: the robot moves on its own. Clear the workspace, keep an e-stop ready.
+defaults:
+  - devices: quest3_replay_r1
+  - device_manager: base
+  - action_executor: default
+  - consumer: default
+  - runtime: default
+  - _self_
+
+device_manager:
+  device_manager:
+    params:
+      buffer_size: 100
+
+robot:
+  home: 0
+
+global_settings:
+  log_level: INFO
+  restart_on_failure: false
+  max_restart_attempts: 0
+  restart_delay: 2.0
+
+hydra:
+  run:
+    dir: .
+  output_subdir: null

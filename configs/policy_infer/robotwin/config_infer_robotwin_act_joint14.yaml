@@ -1,0 +1,29 @@
+# @package _global_
+
+defaults:
+  - /policy_infer/robotwin/config_infer_robotwin_replay_joint14
+  - _self_
+
+robotwin:
+  act_source: third_party/robotwin_act/policy
+  # Downloaded from TianxingChen/RoboTwin2.0 by scripts/robotwin/download_act_checkpoint.py.
+  act_ckpt_dir: checkpoints/robotwin/act/beat_block_hammer/demo_clean-50
+
+policy:
+  class: RoboTwinACTPolicy
+  params:
+    ckpt_dir: ${robotwin.act_ckpt_dir}
+    act_source: ${robotwin.act_source}
+    robot_device: RoboTwinSimRobot_0
+    camera_devices:
+      head_camera: RoboTwinCamera_0
+      left_camera: RoboTwinCamera_1
+      right_camera: RoboTwinCamera_2
+    device: cuda:0
+    # This GUI preset shares a 4 GiB-class GPU with SAPIEN. Use FP16 for the
+    # historical model parameters and inference tensors; set float32 on a GPU
+    # with enough free VRAM when exact historical numeric precision is needed.
+    inference_dtype: float16
+    chunk_size: ${policy.chunk_length}
+    image_height: 480
+    image_width: 640

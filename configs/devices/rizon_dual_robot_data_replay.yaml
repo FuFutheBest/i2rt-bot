@@ -1,0 +1,133 @@
+# Rizon dual-arm recorded TCP replay (scripts/replay/robot_record_replay.py)
+# Author: Yichen Xie
+
+robot:
+  class: "RizonRobot"
+  device_class_id: 2
+  robot_sn: ["Rizon 4-063087", "Rizon 4R-062071"]
+  state_feedback:
+    fps: 100.0
+    buffer_size: 1000
+    hardware_latency_ms: 0.0
+    format:
+      shape: [44]
+      dtype: "float64"
+      # Per arm: joint position/velocity, measured TCP pose (WXYZ), gripper width.
+      type: [j1-7, dq1-7, xyz, qwqxqyqz, gripper, j1-7, dq1-7, xyz, qwqxqyqz, gripper]
+  control:
+    type: eef_abs  # joints | eef_abs | eef_rel
+    format:
+      shape: [16]
+      dtype: "float64"
+      # Per arm: absolute TCP pose (WXYZ) and recorded gripper command.
+      type: [xyz, qwqxqyqz, gripper, xyz, qwqxqyqz, gripper]
+  # signal_files: loaded from configs/runtime/default.yaml by robot_record_replay.py
+  motion_limits:
+    velocity:
+      tcp_linear_m_s: 0.1
+      tcp_angular_rad_s: 0.5
+    acceleration:
+      tcp_linear_m_s2: 0.5
+      tcp_angular_rad_s2: 2.0
+
+  # ---- Gripper replay (LKTech soft gripper, [left, right]) ----
+  # The control format above contains one recorded gripper command per arm.
+  # Remove a gripper primitive from both state/control formats to disable that arm's gripper.
+  # The recorded grip value (dataset idx 7 / 15) is sent AS-IS through the SDK
+  # using value_mode below. `width_m` sends it directly as a width in meters and
+  # mirrors the verified inference config (infer_rizon_fisheye_umi3_dual_openpi.yaml);
+  # switch to `normalized` (and set min_width/max_width) only if your dataset grip
+  # is a 0..1 open ratio instead of meters.
+  gripper:
+    backend: "lktech"
+    gripper_type: "soft"
+    tool_name: ""
+    name: "gripper"
+    port: ["/dev/ttyUSB0", "/dev/ttyUSB1"]
+    motor_id: [1, 1]
+    speed_dps: [1000.0, 1000.0]
+    max_vel: [0.5, 0.5]
+    auto_calibrate: [false, false]
+    home_width: [0.08, 0.08]
+    calibration_files:
+      - "calibration/lktech_gripper/LKTech-Gripper-1_2_id1_calibration.json"
+      - "calibration/lktech_gripper/LKTech-Gripper-2_2_id1_calibration.json"
+    scale_factor: [1.0, 1.0]
+    value_mode: "width_m"
+    min_width: null
+    max_width: [0.0925319933860716, 0.0925319933860716]
+    command_offset: [0.0, 0.0]
+
+  home:
+    preset_index: 0
+    presets:
+      - name: "rizon_dual_default"
+        description: "Dual-arm calibrated home pose default"
+        joints_left: [1.401673922276646, 1.7130406608324346, 0.3286454981505322, 2.002590783718319, 0.8367108434060815, 0.8920377806943019, -0.18517943363659836]
+        joints_right: [1.2663822174072266, 1.3955061435699463, 0.6105675101280212, 1.724402904510498, 1.0657531023025513, 1.0845757722854614, 0.028192929923534393]
+
+      # - name: "rizon_dual_gripper_test"
+      #   description: "Dual-arm gripper test home pose"
+      #   joints_left: [1.336748, 1.111077, 0.987856, 2.054602, 0.719250, 2.156180, 0.0]
+      #   joints_right: [1.336748, 1.111077, 0.987856, 2.054602, 0.719250, 2.156180, 0.0]
+
+replay:
+  frequency: 40.0
+  start_index: 0
+  end_index: null
+  loop: false
+  record_actual_tcp: false
+
+yam_head_tracking:
+  enabled: true
+  startup_wait_s: 6.0
+  yam_head:
+    class: "YamHeadRobot"
+    device_class_id: 0
+    state_feedback:
+      fps: 60.0
+      buffer_size: 100
+      hardware_latency_ms: 5.0
+      format:
+        shape: [20]
+        dtype: "float64"
+        # Six joints, commanded TCP pose, then measured TCP pose; quaternions XYZW.
+        type: [j1-6, xyz, qxqyqzqw, xyz, qxqyqzqw]
+    yam_channel: "can1"
+    yam_arm: "yam"
+    yam_gripper: "no_gripper"
+    yam_sim: false
+    yam_ee_site: "grasp_site"
+    yam_initial_q: "0.035511,0.890668,0.0,0.121407,0.114410,0.02"
+    ramp_duration_s: 5.0
+    home_to_zero_on_exit: true
+    use_publisher: true
+    yam_publisher_hz: 143.0
+    yam_publisher_vmax: 0.4
+    yam_publisher_amax: 5.0
+    yam_max_step: 0.01
+    yam_ik_max_iters: 30
+    yam_ik_soft_pos_tol: 0.02
+    yam_ik_soft_ori_tol: 0.10
+    yam_head_filter_tau: 0.06
+    track_robot_center: true
+    robot_state_device_name: "RizonRobot"
+    robot_state_device_class_id: 2
+    robot_center_offset_xyz: [0.0, 0.0, 0.0]
+    yam_focus_position_xyz: [0.323, 0.0, 0.2]
+    yam_focus_target_noise_std_xyz: [0.01, 0.01, 0.005]
+    yam_focus_target_noise_tau_s: 1.5
+    yam_focus_target_noise_seed: null
+    left2world_json_path: "calibration/left2world.json"
+    right2world_json_path: "calibration/right2world.json"
+    yam2world_json_path: "calibration/yam2world.json"
+    yam_focus_local_forward: [0.0, 0.0, 1.0]
+    yam_focus_local_up: [-1.0, 0.0, 0.0]
+    yam_focus_world_up: [0.0, 0.0, 1.0]
+    yam_focus_world_y_pitch_deg: -45.0
+
+dataset:
+  data_file: "replay_debug/episode_000021.parquet"
+  # LeRobot: per-arm [x,y,z,w,x,y,z]; 14D dual-arm or 16D with gripper. Uses action, else observation.state
+  # replay_column: action
+  # timestamp_column: timestamp

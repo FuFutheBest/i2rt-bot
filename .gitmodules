@@ -1,0 +1,20 @@
+[submodule "third_party/openpi"]
+	path = third_party/openpi
+	url = git@gitlab.noematrix.cn:noematrix/pre-training/openpi.git
+	branch = main
+[submodule "third_party/i2rt"]
+	path = third_party/i2rt
+	url = git@gitlab.noematrix.cn:noematrix/pre-training/i2rt.git
+	branch = fix/passive-encoder-wrap
+[submodule "third_party/lktech_motor_sdk"]
+	path = third_party/lktech_motor_sdk
+	url = git@gitlab.noematrix.cn:noematrix/pre-training/lktech_motor_sdk.git
+	branch = main
+[submodule "third_party/nmx_vla"]
+	path = third_party/nmx_vla
+	url = git@gitlab.noematrix.cn:noematrix/pre-training/nmx_vla.git
+	branch = junlin/fasterwam-inference
+[submodule "third_party/RoboTwin"]
+	path = third_party/RoboTwin
+	url = git@gitlab.noematrix.cn:noematrix/pre-training/RoboTwin.git
+	branch = superinference

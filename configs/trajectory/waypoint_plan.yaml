@@ -1,0 +1,122 @@
+# Waypoint plan for scripts/benchmark/test_trajectory_planner.py
+
+# Input waypoint space:
+# joint -> waypoint_plan points are [time, jointss].
+# cartesian -> reads waypoint_plan.manual_poses_wxyz as [time, [x,y,z,qw,qx,qy,qz]].
+trajectory_space: cartesian
+
+# URDF frame used by PinocchioKinematicsSolver / planner IK (must exist on the model).
+cartesian_ik:
+  urdf_path: "assets/robot/rizon/flexiv_Rizon4_kinematics.urdf"
+  urdf_ee_frame: "flange"
+  seed_joints: [1.336748, 1.111077, 0.987856, 2.054602, 0.719250, 2.156180, 1.131322]
+  dt: 0.1
+  max_iters: 1000
+  eps: 1.0e-5
+  damping: 1.0e-6
+  world_frame_transform:
+    # w_urdf_T_w_rbt for Rizon4R-062070
+    # - [-0.0013608856447698222, -0.0031357859822335175, 0.9999941574011995, -0.00013582366982351475]
+    # - [0.002358722477313538, 0.9999922915549982, 0.0031389901016189103, 0.0017764365284734527]
+    # - [-0.9999962922023943, 0.002362980502812789, -0.0013534787055772856, 0.00016435057668596792]
+    # - [0.0, 0.0, 0.0, 1.0]
+    - [0.00777819, 0.00010708, 0.99996974, 0.00375957]
+    - [0.00193568, 0.99999812, -0.00012214, 0.00159414]
+    - [-0.99996788, 0.00193657, 0.00777797, 0.00042141]
+    - [0.00000000, 0.00000000, 0.00000000, 1.00000000]
+
+waypoint_plan:
+  manual_joints:
+  # 1 deg
+    - [0.0, [1.551, 1.019, 0.913, 2.031, 1.255, 2.413, 1.309]]
+    - [0.10, [1.531, 1.039, 0.893, 2.011, 1.255, 2.413, 1.289]]
+    - [0.20, [1.511, 1.019, 0.893, 2.031, 1.235, 2.393, 1.269]]
+    - [0.30, [1.491, 1.019, 0.873, 2.021, 1.245, 2.383, 1.249]]
+  # 5 deg
+    # - [0.0, [1.551, 1.019, 0.913, 2.031, 1.255, 2.413, 1.309]]
+    # - [1.0, [1.471, 1.099, 0.833, 1.951, 1.255, 2.413, 1.229]]
+    # - [2.0, [1.391, 1.019, 0.833, 2.031, 1.175, 2.333, 1.149]]
+    # - [3.0, [1.311, 1.019, 0.753, 2.071, 1.255, 2.253, 1.069]]
+  # 2 deg
+    # - [0.0, [1.551, 1.019, 0.913, 2.031, 1.255, 2.413, 1.309]]
+    # - [0.30, [1.511, 1.059, 0.873, 1.991, 1.255, 2.413, 1.269]]
+    # - [0.60, [1.471, 1.019, 0.873, 2.031, 1.215, 2.373, 1.229]]
+    # - [0.90, [1.431, 1.019, 0.833, 2.071, 1.255, 2.333, 1.189]]
+  # Used when trajectory_space=cartesian.
+  # - [0.0, [x, y, z, qw, qx, qy, qz]]
+  manual_poses_wxyz: [
+    [0.0, [-0.90239, -0.1199, -0.15975, 0.03302, -0.57507, -0.47415, 0.66587]],
+    [0.5,  [-0.881, -0.1064, -0.15974, 0.01538, -0.5758, -0.45356, 0.68007]],
+    [1.0, [-0.881, -0.06456, -0.15974, 0.04208, -0.63909, -0.41495, 0.64623]],
+    [1.5, [-0.907, -0.01249, -0.19373, 0.03988, 0.72203, 0.31493, -0.61474]],
+  ]
+
+  # Optional periodic full-wave waypoint generator.
+  # When enabled, the first waypoint always returns to q0.
+  # Joint mode:
+  # - uses q0 as joint center and amplitude as joint amplitude in degrees.
+  #   q(t) = q0 + deg2rad(A) * sin(2*pi*F*t)
+  # Cartesian mode:
+  # - uses FK(q0) as Cartesian center.
+  # - uses amplitude as xyz translation amplitude in meters and keeps orientation unchanged.
+  # - axes controls which translation axes are tested; ignored in joint mode.
+
+  # frequency/amplitude lists represent multiple test segments in one run.
+  # n_waypoints_per_period: -1 keeps peak/valley waypoints only; otherwise samples each period uniformly.
+  periodic_wave:
+    enabled: true
+    q0: [1.336748, 1.111077, 0.987856, 2.054602, 0.719250, 2.156180, 1.131322]   # vibration center joint positions
+    # axes: joints
+    # amplitude: [0.5, 1.0, 2.0]  # joint mode: degrees
+    axes: [x] # multi axis move simultaneously
+    frequency: [0.15] # Hz
+    amplitude: [0.05] # m or deg
+    period_count: 5
+    n_waypoints_per_period: 120
+
+# Execution mode:
+# planner -> use the C++ Ruckig/IK trajectory planner worker.
+# direct_waypoint -> send each waypoint directly at its timestamp with NRT send APIs.
+execution_mode: planner
+
+# When execution_mode=direct_waypoint: feed (target-current)/dt as velocity to
+# SendCartesianMotionForce (trajectory_space=cartesian) or SendJointPosition (joint).
+direct_waypoint_velocity_feedforward: false
+
+# Planner execution mode:
+# true -> RT planner streaming mode; ignored when execution_mode=direct_waypoint.
+# false -> NRT planner discrete send mode.
+rt: true
+
+# Ruckig interpolation control cycle.
+ruckig_control_dt: 0.001
+
+# Optional Ruckig limits. Length must match joint DoF.
+max_velocity: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+max_acceleration: [2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0]
+max_jerk: [3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0]
+# max_velocity: [2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0]
+# max_acceleration: [5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0]
+# max_jerk: [8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0]
+
+robot:
+  device_class_id: 0
+  robot_sn: "Rizon4-062717"
+  # robot_sn: "Rizon4R-simulator0"
+  fps: 100.0
+  signal_files:
+    robot_home_command_pattern: "signal_files/robot_{}_home.cmd"
+    policy_runner_reset_command: "signal_files/policy_runner_reset.cmd"
+    reset_signal: "signal_files/reset.signal"
+
+# Delay before first trajectory point is executed.
+run_start_delay: 2
+
+# Hold after the final trajectory waypoint before stopping planner/recording.
+final_hold_seconds: 0.0
+
+
+recording:
+  enabled: true
+  output_path: "./logs/trajectory_run_record.json"
+  sample_dt: 0.02

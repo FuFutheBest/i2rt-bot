@@ -1,0 +1,320 @@
+# @package _global_
+
+defaults:
+  - /devices/infer@devices: rizon_dual_eef_abs_fisheye_webcam
+  - /device_manager: sync
+  - /action_executor: base_auto_drop
+  - /yam_head_tracking: planned_robot_center_scaled_motion
+  - /consumer: default
+  - /runtime: default
+  - _self_
+
+device_manager:
+  device_manager:
+    master_device_class_id: 2
+    params:
+      buffer_size: 500
+
+shared:
+  summary_shm_name: device_summary_data
+
+camera:
+  left_capture_id: 2
+  right_capture_id: 0
+
+global_settings:
+  log_level: INFO
+  restart_on_failure: true
+  max_restart_attempts: 3
+  restart_delay: 2.0
+
+hydra:
+  run:
+    dir: .
+  output_subdir: null
+
+summary_shm: device_summary_data
+
+action_executor:
+  action_executor:
+    chunk_manager:
+      type: base_manager
+      skip_first_chunk: true
+
+# action_executor:
+#   action_executor:
+#     chunk_manager:
+#       type: auto_manager_v2
+#       search_tolerance: 4
+#       pos_weight: 0.4
+#       rot_weight: 0.1
+#       ee_weight: 0.01
+#       discount_factor: 0.98
+#       direction_consistency_range: 4
+
+policy:
+  class: LingBotVAPolicy
+  params:
+    # Supports:
+    # 1) /path/to/run_dir                     (auto pick latest checkpoint_step_xxx)
+    # 2) /path/to/checkpoint_step_xxx
+    # 3) /path/to/checkpoint_step_xxx/transformer
+
+
+    # 0625 test
+    #ckpt_path: "/home/noematrix/lingbotva_ckpts/0625ckpt/giftbox_single8gpu1ga_dropvideo0.8_1758episodes_12000pre"
+    #ckpt_path: "/home/noematrix/lingbotva_ckpts/0625ckpt/giftbox_single8gpu1ga_dropvideo_1057fixed"
+
+    # 0626 test
+    #ckpt_path: "/home/noematrix/lingbotva_ckpts/0626ckpt/giftbox_8node8gpu1ga_ws3-16_1758ep_12000pre_dropvideo"
+    # ckpt_path: "/home/noematrix/lingbotva_ckpts/0626ckpt/giftbox_0621_663episodes_gripperfixed_8node1ga8gpu_ws3-16_dropvideo_22200pre"
+
+    # 0627 yuanhe test
+    # ckpt_path: "/home/noematrix/lingbotva_ckpts/0627ckpt/yuanhegiftbox_0626_232episodes_8node1ga8gpu_ws3-16_dropvideo_22200"
+
+    # 0628 test
+    # ckpt_path: "/home/noematrix/lingbotva_ckpts/0628ckpt/yuanhegiftbox_0626_232episodes_8node1ga8gpu_ws3-16_dropvideo_22200_fixquat"
+    # ckpt_path: "/home/noematrix/lingbotva_ckpts/0628ckpt/giftbox_8node8gpu1ga_ws3-16_1758ep_12000pre_fixquat_dropvideo0"
+
+    #0629 test
+    # ckpt_path: "/home/noematrix/lingbotva_ckpts/0629ckpt/giftbox_8node8gpu1ga_ws3-16_1758ep_12000pre_fixquat_dropvideo0.8"
+
+    # 0630 test
+    # ckpt_path: "/home/noematrix/lingbotva_ckpts/0630ckpt/giftbox_0628_1912episodes_qc_accept_1658episodes_8node1ga8gpu_ws3-16_dropvideo1_12000pre"
+    # ckpt_path: "/home/noematrix/lingbotva_ckpts/0630ckpt/giftbox_0628_1912episodes_qc_accept_1658episodes_8node1ga8gpu_ws3-16_dropvideo1_noactionhistory_12000pre"
+
+    # 0701 test
+    # ckpt_path: "/home/noematrix/lingbotva_ckpts/0701ckpt/giftbox_R1_761episodes_qc_accept_504episodes_4node2ga8gpu_ws3-3_dropvideo_6000pre_20260630_234438"
+    # Attn window = 3~3
+    # ckpt_path: "/home/noematrix/lingbotva_ckpts/0701ckpt/giftbox_mix0628_recovery0630p01p02_8node1ga_10000-motpre/"
+    # close-giftbox
+    # ckpt_path: "/home/noematrix/lingbotva_ckpts/0701ckpt/giftbox_closelid_0629_1630episodes_qc_accept_8node1ga8gpu_ws3-3_dropvideo1_attn3_6000pre"
+
+    ## 7/4 test
+    # video/action history ablation
+    # ckpt_path: /home/noematrix/lingbotva_ckpts/0704ckpt/giftbox_base_recovery_p1p2p3_8node1ga8gpu_ws3-3_dropvideo0_dropah1_10000pre_20260703_234924/checkpoint_step_4000
+
+    ## 7/5 test
+    #ckpt_path: "/home/noematrix/lingbotva_ckpts/0705ckpt/giftbox_random_0703_8node1ga8gpu_ws3-17_dropvideo1_dropah1_10000pre_20260705_020444"
+
+    # 7/5 night
+    #ckpt_path: "/home/noematrix/lingbotva_ckpts/0705ckpt/giftbox_random_0703_8node1ga8gpu_ws3-17_dropvideo0_dropah1_lrdecay_10000pre_20260705_020444"
+    # ckpt_path: "/home/noematrix/lingbotva_ckpts/0705ckpt/giftbox_random_0703_8node1ga8gpu_ws3-17_dropvideo0_dropah1_10000pre_20260705_020444"
+    # ckpt_path: "/home/noematrix/lingbotva_ckpts/0705ckpt/giftbox_random_recovery_p1p5_8node1ga8gpu_ws3-3_dropvideo0_dropah1_lrdecay_10000pre_20260705_165222"
+    #ckpt_path: "/home/noematrix/lingbotva_ckpts/0706ckpt/giftbox_random_recovery_p1p5_8node1ga8gpu_ws3-3_dropvideo0_dropah1_10000pre_20260705_165222/checkpoint_step_8000"
+
+    # 7/7 test
+    # ckpt_path: "/home/noematrix/lingbotva_ckpts/0707ckpt/giftbox_zdworkordie_0706_48node1ga8sp8_gbs48_ws3-3_dropvideo0_dropah1_drophead1_gcfalse_10000pre_v2_active6x8_20260707_sp48v2_active6x8"
+
+    # 7/8 test
+    ckpt_path: "/home/noematrix/lingbotva_ckpts/0708ckpt/chip_rrp_0701_48node1ga8sp8_gbs48_ws3-3_dropvideo0_dropah1_drophead1_gcfalse_fastwam_action30_no_learnable_token_10000steps_sharedpre_20260708_develop_sp48/checkpoint_step_2000"
+
+    host: 127.0.0.1
+    port: 18080
+
+
+    # task: |-
+    #   Hardware: 310
+    #   Dataset: datasets_giftbox_0621_1758episodes_0.2.21
+    #   FPS: 10
+    #   Action Space: state; 23d total; 7d left arm eef pose; 1d left gripper; 7d right arm eef pose; 1d right gripper; 7d head eef pose
+    #   Task: Place the lanyard into the gift box
+
+    # task: |-
+    #   Hardware: 310
+    #   Dataset: datasets_giftbox_0621_1758episodes_0.2.21
+    #   FPS: 10
+    #   Action Space: state; 23d total; 7d left arm eef pose; 1d left gripper; 7d right arm eef pose; 1d right gripper; 7d head eef pose
+    #   Task: Place the lanyard into the gift box
+
+    # task: |-
+    #   Hardware: 310
+    #   Dataset: datasets_giftbox_0628_1912episodes_qc_accept_1658episodes_0.2.22
+    #   FPS: 10
+    #   Action Space: state; 23d total; 7d left arm eef pose; 1d left gripper; 7d right arm eef pose; 1d right gripper; 7d head eef pose
+    #   Task: Place the lanyard into the gift box
+
+    # task: |-
+    #   Hardware: 310
+    #   Dataset: datasets_giftbox_0621_1758episodes_0.2.21
+    #   FPS: 10
+    #   Action Space: state; 23d total; 7d left arm eef pose; 1d left gripper; 7d right arm eef pose; 1d right gripper; 7d head eef pose
+    #   Task: Place the lanyard into the gift box
+
+    # task: |-
+    #   Hardware: 310
+    #   Dataset: datasets_yuanhegiftbox_0626_232episodes_0.2.22
+    #   FPS: 10
+    #   Action Space: state; 23d total; 7d left arm eef pose; 1d left gripper; 7d right arm eef pose; 1d right gripper; 7d head eef pose
+    #   Task: Place the lanyard into the gift box
+
+    # task: |-
+    #     Hardware: 313
+    #     Dataset: zhangdi_giftbox_R1_761episodes_qc_accept_504episodes_0.2.23
+    #     FPS: 10
+    #     Action Space: state; 16d total; 7d left arm eef pose; 1d left gripper; 7d right arm eef pose; 1d right gripper
+    #     Task: Place the lanyard into the gift box
+
+    # Attn window = 3~3
+    # task: |-
+    #   Hardware: 310
+    #   Dataset: filtered_datasets_giftbox_0628_1912episodes_qc_accept_0.2.22
+    #   FPS: 10
+    #   Action Space: state; 23d total; 7d left arm eef pose; 1d left gripper; 7d right arm eef pose; 1d right gripper; 7d head eef pose
+    #   Task: Place the lanyard into the gift box
+
+    ## 7/4 test
+    # task: |-
+    #   Hardware: 310
+    #   Dataset: giftbox
+    #   FPS: 10
+    #   Action Space: state; 23d total; 7d left arm eef pose; 1d left gripper; 7d right arm eef pose; 1d right gripper; 7d head eef pose
+    #   Task: Place the lanyard into the gift box
+
+    ## 7/5 test
+    # task: |-
+    #   Hardware: 310
+    #   Dataset: giftbox
+    #   FPS: 10
+    #   Action Space: state; 23d total; 7d left arm eef pose; 1d left gripper; 7d right arm eef pose; 1d right gripper; 7d head eef pose
+    #   Task: Place the lanyard into the gift box
+
+    # 7/8 test
+    task: |-
+      Hardware: 310
+      Dataset: chip rrp
+      FPS: 10
+      Action Space: state; 23d total; 7d left arm eef pose; 1d left gripper; 7d right arm eef pose; 1d right gripper; 7d head eef pose
+      Task: Place the chip into the wooden box based on the soccer ball's position
+
+    # # close-giftbox
+    # task: |-
+    #   Hardware: 310
+    #   Dataset: zhangdi_giftbox_closelid_0629_1630episodes_qc_accept_0.2.23
+    #   FPS: 10
+    #   Action Space: state; 23d total; 7d left arm eef pose; 1d left gripper; 7d right arm eef pose; 1d right gripper; 7d head eef pose
+    #   Task: Close the gift box lid and press it downS
+
+    ## 7/7 test
+    # task: |-
+    #   Hardware: 310
+    #   Dataset: giftbox
+    #   FPS: 10
+    #   Action Space: state; 23d total; 7d left arm eef pose; 1d left gripper; 7d right arm eef pose; 1d right gripper; 7d head eef pose
+    #   Task: Place the lanyard into the gift box
+
+    device: "cuda"
+    camera_devices: # mapping from camera_devices to model_camera_keys
+      - "WebCameraDevice_0"
+      - "WebCameraDevice_1"
+    model_camera_keys:
+      - observation.images.wrist_image_1
+      - observation.images.wrist_image_2
+    robot_device: RizonRobot_2
+
+    param_dtype: bf16
+    attn_mode: flashattn
+    enable_offload: false
+    offload_vae: false
+    offload_text_encoder: true
+    stateless_reset_each_predict: false
+    block: true
+    skip_last_obs_latents: 0
+    # Training used action_history_condition_dropout_prob=1.0. This checkpoint
+    # was trained without learnable action-token routing for the dropped action
+    # history, so inference should use zero condition actions without marking
+    # them as learned all-missing embeddings.
+    zero_action_condition: true
+    zero_action_condition_uses_missing_embedding: false
+    learnable_action_embedding_config:
+      enabled: true
+      enable_unused_canonical_dims: false
+      dataset_used_canonical_dims: []
+      gripper_canonical_dims: []
+      gripper_raw_dims: []
+
+    # History KV-cache anchoring: wait until the arm physically reaches the last action
+    # pose of the chunk, then sample images + robot poses backward from that moment.
+    history_anchor_mode: now            # "arrival" | "now" (legacy forward-from-predict)
+    # history_now_base_offset_ns: 100000000
+    history_now_base_offset_ns: 0
+    history_now_last_keyframe_offset_ns: 200000000
+    history_arrival_pos_tolerance_m: 0.01   # position tolerance (meters) for arrival
+    history_arrival_rot_tolerance_rad: 0.2  # orientation tolerance (radians) for arrival
+    history_arrival_timeout_s: 1.0          # give up waiting and anchor at "now" after this
+    history_state_from_robot_pose: true     # build compute_kv_cache state from actual poses
+    history_manual_selection:
+      enabled: false
+      window_ms: 600.0
+      max_candidates_per_step: 15
+      timeout_s: 0.0
+      auto_open_browser: true
+      port: 0
+      save_dir: /tmp/superinference_manual_history_picker
+
+    gripper_max_width: 0.11
+    normalize_gripper_width: false
+    print_predicted_gripper_action: true
+    # TODO(remove hack): gripper command close-bias hack is configured in
+    # configs/devices/infer/rizon_dual_eef_abs_fisheye_webcam.yaml under gripper.command_offset.
+
+    # crop 360x640 -> 360x270, then resize to hxw=320x240
+    reshape_mode: crop_resize
+    center_crop_before_resize: false
+    crop_before_resize:
+      - 185
+      - 185
+      - 0
+      - 0
+    crop_resize_size:
+      - 320
+      - 240
+    pad_after_resize: null
+
+    frame_chunk_size: 4 # 2
+    # attn_window: 30
+    attn_window: 2
+    guidance_scale: 5.0
+    action_guidance_scale: 1.0
+    num_inference_steps: 10 # 25
+    action_num_inference_steps: 10 # 50
+
+    save_root: /home/noematrix/SuperInference.lingbotva/logs/runs
+    save_predicted_video_latents: false
+    save_history_cache_latents: false
+    decoded_latent_save_dir: /home/noematrix/SuperInference.lingbotva/logs/decoded_lingbot_latents
+
+  fps: 100
+  control_fps: 30.0 # 30.0
+  chunk_length: 48 # 24
+
+  obs:
+    devices:
+      - "WebCameraDevice_0"
+      - "WebCameraDevice_1"
+      - RizonRobot_2
+
+  controls:
+    - endpoint:
+        device: RizonRobot
+        device_class_id: 2
+        port: command
+      shape:
+        - 16
+      dtype: float64
+
+  infer_rollout:
+    enabled: false
+    episode_control:
+      enabled: true
+      success_key: 's'
+      failure_key: 'f'
+      discard_key: 'd'
+      auto_restart: true
+      home_wait_time: 6.0
+      halt_settle_time: 0.5
+      policy_runner_reset_timeout: 1.0
+
+  history_video:
+    enabled: true
+    save_dir: /home/noematrix/SuperInference.lingbotva/logs/0624_history_keyframes"

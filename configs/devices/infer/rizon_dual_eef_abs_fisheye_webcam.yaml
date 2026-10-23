@@ -1,0 +1,177 @@
+# Rizon dual-arm EEF absolute control with UMI3 fisheye webcam wrists.
+
+devices:
+- class: "WebCameraDevice"
+  device_class_id: 0
+  capture_id: ${camera.left_capture_id}
+  state_feedback:
+    fps: 30.0
+    buffer_size: 200
+    hardware_latency_ms: 200.0
+    format:
+      shape: [360, 640, 3]
+      dtype: "uint8"
+      type: rgb
+  capture_fourcc: "MJPG"
+  rotation_degrees: 180
+  capture_buffer_size: 1
+  camera_controls:
+    brightness: 80
+    contrast: 50
+    saturation: 120
+    hue: 0
+    gamma: 60
+    gain: 102
+    sharpness: 130
+    backlight: 40
+    auto_exposure: 3
+    auto_white_balance: 1
+    white_balance_temperature: 4664
+    power_line_frequency: 60
+    pan: 0
+    tilt: 0
+    autofocus: 0
+
+- class: "WebCameraDevice"
+  device_class_id: 1
+  capture_id: ${camera.right_capture_id}
+  state_feedback:
+    fps: 30.0
+    buffer_size: 200
+    hardware_latency_ms: 200.0
+    format:
+      shape: [360, 640, 3]
+      dtype: "uint8"
+      type: rgb
+  capture_fourcc: "MJPG"
+  rotation_degrees: 90
+  capture_buffer_size: 1
+  camera_controls:
+    brightness: 80
+    contrast: 50
+    saturation: 120
+    hue: 0
+    gamma: 60
+    gain: 102
+    sharpness: 130
+    backlight: 40
+    auto_exposure: 3
+    auto_white_balance: 1
+    white_balance_temperature: 4664
+    power_line_frequency: 60
+    pan: 0
+    tilt: 0
+    autofocus: 0
+
+- class: "RizonRobot"
+  device_class_id: 2
+    # Flexiv SDK currently connects via robot_sn; IPs are documented here for reference:
+    # left: 192.168.1.100
+    # right: 192.168.1.101
+  robot_sn: ["Rizon 4-063256", "Rizon 4R-062088"]
+  state_feedback:
+    fps: 120.0
+    buffer_size: 100000
+    hardware_latency_ms: 0.0
+    format:
+      shape: [44]
+      dtype: "float64"
+        # Flattened order: left arm, then right arm. Each arm publishes joint
+        # position, joint velocity, TCP xyz, TCP quaternion (WXYZ), and gripper.
+      type: [j1-7, dq1-7, xyz, qwqxqyqz, gripper, j1-7, dq1-7, xyz, qwqxqyqz, gripper]
+  control:
+    type: eef_abs    # joints | eef_abs | eef_rel
+    execution:
+      mode: synchronous    # synchronous | legacy_async
+      fps: 100.0
+    buffer_size: 100
+    format:
+      shape: [16]
+      dtype: "float64"
+        # Per arm: absolute TCP xyz, TCP quaternion (XYZW), then gripper command.
+      type: [xyz, qxqyqzqw, gripper, xyz, qxqyqzqw, gripper]
+    cartesian_impedance:
+      translation_n_m: [10000.0, 10000.0, 10000.0]
+      rotation_nm_rad: [1000.0, 1000.0, 1000.0]
+  motion_limits:
+    velocity:
+      joints_rad_s:
+        left: [0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3]
+        right: [0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3]
+      tcp_linear_m_s: 0.5
+      tcp_angular_rad_s: 0.8
+    acceleration:
+      joints_rad_s2:
+        left: [2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0]
+        right: [2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0]
+      tcp_linear_m_s2: 5.0
+      tcp_angular_rad_s2: 2.0
+      # null disables the limit; otherwise [Fx, Fy, Fz, Mx, My, Mz] in N / N*m.
+    max_tcp_contact_wrench:
+    workspace:
+      enabled: false
+      frame: "robot_base"
+      min_xyz: [0.0, 0.0, 0.0]
+      max_xyz: [0.0, 0.0, 0.0]
+  signal_files: ${runtime.signal_files}
+  gripper:
+    backend: "lktech"
+    gripper_type: "soft"
+    tool_name: "umi3_tcp_copy"
+    name: "gripper"
+    port: ["/dev/ttyUSB1", "/dev/ttyUSB0"]
+    motor_id: [1, 1]
+    speed_dps: [1000.0, 1000.0]
+    max_vel: [0.5, 0.5]
+    auto_calibrate: [false, false]
+      # home_width: [0.05, 0.05]
+    home_width: [0.0925319933860716, 0.0925319933860716]
+    calibration_files:
+    - "calibration/lktech_gripper/LKTech-Gripper-1_2_id1_calibration.json"
+    - "calibration/lktech_gripper/LKTech-Gripper-2_2_id1_calibration.json"
+    scale_factor: [1.0, 1.0]
+    value_mode: "width_m"
+      # Clip policy commands to the calibrated physical opening.
+    min_width:
+    max_width: [0.0925319933860716, 0.0925319933860716]
+    command_offset: [0.0, 0.0]
+  home:
+    joints_left: [1.8811657428741455, 0.83028244972229, 0.5160871744155884, 1.6737215518951416, 0.4546758830547333,
+        1.580374002456665, -0.82899409532547]
+    joints_right: [1.3945053815841675, 1.119052767753601, 0.1794394999742508, 1.3642418384552002, 1.2592859268188477,
+        0.5686454772949219, -0.8828197121620178]
+
+
+- class: "YamHeadRobot"
+  enabled: false
+  device_class_id: 3
+  state_feedback:
+    fps: 60.0
+    buffer_size: 100
+    hardware_latency_ms: 5.0
+    format:
+      shape: [20]
+      dtype: "float64"
+        # Six joints, commanded TCP pose, then measured TCP pose; quaternions XYZW.
+      type: [j1-6, xyz, qxqyqzqw, xyz, qxqyqzqw]
+  yam_channel: "can0"
+  yam_arm: "yam"
+  yam_gripper: "no_gripper"
+  yam_sim: false
+  yam_ee_site: "grasp_site"
+  yam_initial_q: "0,2,0.73,0.82,0,0.02"
+  ramp_duration_s: 5.0
+  home_to_zero_on_exit: true
+  use_publisher: true
+  yam_publisher_hz: 143.0
+  yam_publisher_vmax:
+  yam_publisher_amax: 50.0
+  yam_max_step: 0.03
+  yam_ik_max_iters: 30
+  yam_ik_soft_pos_tol: 0.02
+  yam_ik_soft_ori_tol: 0.10
+  left2world_json_path: "calibration/left2world.json"
+  right2world_json_path: "calibration/right2world.json"
+  yam2world_json_path: "calibration/yam2world.json"
+  tracking: ${yam_head_tracking}
+  home_command_pattern: ${runtime.signal_files.robot_home_command_pattern}

@@ -1,0 +1,1474 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Action State XYZW Visualizer</title>
+  <style>
+    :root {
+      --bg: #f5f6f8;
+      --panel: #ffffff;
+      --text: #17202a;
+      --muted: #657182;
+      --border: #d7dce2;
+      --grid: #e8ebf0;
+      --action: #0f766e;
+      --pred-abs: #db2777;
+      --all-actions: #0ea5e9;
+      --relative: #ea580c;
+      --observation: #2563eb;
+      --state: #7c3aed;
+      --history: #b45309;
+      --history-image: #9333ea;
+      --history-relative: #0891b2;
+      --pred-chunk-a: #0ea5e9;
+      --pred-chunk-b: #f97316;
+      --pred-chunk-c: #a855f7;
+      --chunk-switch: #000000;
+      --query: #16a34a;
+      --reference: #be123c;
+      --inference-start: #15803d;
+      --inference-end: #dc2626;
+      --inference-active: #94a3b8;
+      --kv-cache-start: #ef4444;
+      --kv-cache-end: #7f1d1d;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 18px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 20px;
+      line-height: 1.2;
+      letter-spacing: 0;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: 300px minmax(0, 1fr);
+      gap: 14px;
+      padding: 14px;
+    }
+
+    aside,
+    section {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    aside {
+      display: grid;
+      gap: 12px;
+      align-content: start;
+      height: calc(100vh - 81px);
+      overflow: auto;
+      padding: 14px;
+    }
+
+    section {
+      overflow: hidden;
+      min-width: 0;
+    }
+
+    .chart-wrap {
+      position: relative;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 650;
+      text-transform: uppercase;
+    }
+
+    input,
+    select,
+    button {
+      width: 100%;
+      min-height: 36px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--text);
+      font: inherit;
+      font-size: 14px;
+    }
+
+    input,
+    select { padding: 6px 8px; }
+
+    button {
+      cursor: pointer;
+      font-weight: 650;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 560px;
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .stat {
+      min-width: 0;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 9px;
+    }
+
+    .stat strong {
+      display: block;
+      font-size: 18px;
+      line-height: 1.2;
+    }
+
+    .stat span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .legend {
+      display: grid;
+      gap: 7px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .legend-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 28px;
+      text-transform: none;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .legend-row input {
+      width: 16px;
+      min-height: 16px;
+      height: 16px;
+      margin: 0;
+      flex: 0 0 auto;
+    }
+
+    .line {
+      width: 24px;
+      height: 3px;
+      border-radius: 99px;
+      flex: 0 0 auto;
+    }
+
+    .line.dashed {
+      background: repeating-linear-gradient(
+        90deg,
+        var(--pred-chunk-a) 0 6px,
+        transparent 6px 9px
+      );
+    }
+
+    .hint {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .table-wrap {
+      max-height: calc(100vh - 650px);
+      min-height: 220px;
+      overflow: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th,
+    td {
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--grid);
+      white-space: nowrap;
+      text-align: left;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      background: #fafbfc;
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      z-index: 1;
+    }
+
+    .empty {
+      padding: 32px 14px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    @media (max-width: 900px) {
+      main { grid-template-columns: 1fr; }
+      aside { height: auto; }
+      canvas { height: 430px; }
+      .table-wrap { max-height: 420px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Action State XYZW Visualizer</h1>
+    <p id="fileSummary" class="hint">Load JSONL files from logs/action_state_xyz.</p>
+  </header>
+
+  <main>
+    <aside>
+      <label>
+        XYZW JSONL files
+        <input id="fileInput" type="file" accept=".jsonl,.log,.txt,application/json" multiple>
+      </label>
+      <label>
+        Run folder
+        <input id="folderInput" type="file" accept=".jsonl,.log,.txt,application/json" webkitdirectory multiple>
+      </label>
+      <label>
+        Device
+        <select id="deviceFilter"><option value="">All devices</option></select>
+      </label>
+      <label>
+        Arm
+        <select id="armFilter"><option value="">All arms</option></select>
+      </label>
+      <label>
+        Axis
+        <select id="axisFilter">
+          <option value="x">X</option>
+          <option value="y">Y</option>
+          <option value="z">Z</option>
+          <option value="w">W</option>
+          <option value="joint_0">left_j0</option>
+          <option value="joint_1">left_j1</option>
+          <option value="joint_2">left_j2</option>
+          <option value="joint_3">left_j3</option>
+          <option value="joint_4">left_j4</option>
+          <option value="joint_5">left_j5</option>
+          <option value="joint_6">left_gripper</option>
+          <option value="joint_7">right_j0</option>
+          <option value="joint_8">right_j1</option>
+          <option value="joint_9">right_j2</option>
+          <option value="joint_10">right_j3</option>
+          <option value="joint_11">right_j4</option>
+          <option value="joint_12">right_j5</option>
+          <option value="joint_13">right_gripper</option>
+        </select>
+      </label>
+      <button id="resetZoom" type="button">Reset zoom</button>
+
+      <div class="stats">
+        <div class="stat"><strong id="actionStat">0</strong><span>Actions</span></div>
+        <div class="stat"><strong id="allActionsStat">0</strong><span>All Actions</span></div>
+        <div class="stat"><strong id="alignedActionsStat">0</strong><span>Aligned Actions</span></div>
+        <div class="stat"><strong id="relativeStat">0</strong><span>Relative</span></div>
+        <div class="stat"><strong id="observationStat">0</strong><span>Observations</span></div>
+        <div class="stat"><strong id="stateStat">0</strong><span>States</span></div>
+        <div class="stat"><strong id="historyStat">0</strong><span>History</span></div>
+        <div class="stat"><strong id="historyRelativeStat">0</strong><span>History Relative</span></div>
+        <div class="stat"><strong id="queryStat">0</strong><span>Query</span></div>
+        <div class="stat"><strong id="referenceStat">0</strong><span>Reference</span></div>
+        <div class="stat"><strong id="inferenceStartStat">0</strong><span>Inf Start</span></div>
+        <div class="stat"><strong id="inferenceEndStat">0</strong><span>Inf End</span></div>
+        <div class="stat"><strong id="kvCacheStartStat">0</strong><span>KV Start</span></div>
+        <div class="stat"><strong id="kvCacheEndStat">0</strong><span>KV End</span></div>
+        <div class="stat"><strong id="spanStat">0 ms</strong><span>Time span</span></div>
+      </div>
+
+      <div class="legend">
+        <label class="legend-row">
+          <input id="showAction" type="checkbox" checked>
+          <span class="line" style="background: var(--action)"></span>
+          action xyzw
+        </label>
+        <label class="legend-row">
+          <input id="showAllActions" type="checkbox" checked>
+          <span class="line" style="background: linear-gradient(90deg, var(--pred-chunk-a) 0 31%, var(--pred-chunk-b) 34% 64%, var(--pred-chunk-c) 67% 100%)"></span>
+          all actions xyzw (original full chunk)
+        </label>
+        <label class="legend-row">
+          <input id="showAlignedActions" type="checkbox" checked>
+          <span class="line dashed"></span>
+          aligned actions xyzw (post alignment)
+        </label>
+        <label class="legend-row">
+          <input id="showRelative" type="checkbox" checked>
+          <span class="line" style="background: var(--relative)"></span>
+          relative xyzw
+        </label>
+        <label class="legend-row">
+          <input id="showObservation" type="checkbox" checked>
+          <span class="line" style="background: var(--observation)"></span>
+          observation xyzw
+        </label>
+        <label class="legend-row">
+          <input id="showState" type="checkbox" checked>
+          <span class="line" style="background: var(--state)"></span>
+          state xyzw
+        </label>
+        <label class="legend-row">
+          <input id="showHistory" type="checkbox" checked>
+          <span class="line" style="background: var(--history)"></span>
+          history xyzw
+        </label>
+        <label class="legend-row">
+          <input id="showHistoryImage" type="checkbox" checked>
+          <span class="line" style="background: var(--history-image)"></span>
+          history image xyzw
+        </label>
+        <label class="legend-row">
+          <input id="showHistoryRelative" type="checkbox" checked>
+          <span class="line" style="background: var(--history-relative)"></span>
+          history relative xyzw
+        </label>
+        <label class="legend-row">
+          <input id="showPredChunkStart" type="checkbox" checked>
+          <span class="line" style="background: linear-gradient(90deg, var(--pred-chunk-a) 0 31%, var(--pred-chunk-b) 34% 64%, var(--pred-chunk-c) 67% 100%)"></span>
+          all actions band start
+        </label>
+        <label class="legend-row">
+          <input id="showPredChunkEnd" type="checkbox" checked>
+          <span class="line" style="background: linear-gradient(90deg, var(--pred-chunk-a) 0 31%, var(--pred-chunk-b) 34% 64%, var(--pred-chunk-c) 67% 100%)"></span>
+          all actions band end
+        </label>
+        <label class="legend-row">
+          <input id="showChunkSwitch" type="checkbox" checked>
+          <span class="line" style="background: var(--chunk-switch)"></span>
+          chunk switch
+        </label>
+        <label class="legend-row">
+          <input id="showQuery" type="checkbox" checked>
+          <span class="line" style="background: var(--query)"></span>
+          query xyzw
+        </label>
+        <label class="legend-row">
+          <input id="showReference" type="checkbox" checked>
+          <span class="line" style="background: var(--reference)"></span>
+          reference xyzw
+        </label>
+        <label class="legend-row">
+          <input id="showInferenceStart" type="checkbox" checked>
+          <span class="line" style="background: var(--inference-start)"></span>
+          inference start
+        </label>
+        <label class="legend-row">
+          <input id="showInferenceEnd" type="checkbox" checked>
+          <span class="line" style="background: var(--inference-end)"></span>
+          inference end
+        </label>
+        <label class="legend-row">
+          <input id="showInferenceActive" type="checkbox" checked>
+          <span class="line" style="background: var(--inference-active)"></span>
+          inference active
+        </label>
+        <label class="legend-row">
+          <input id="showKvCacheStart" type="checkbox" checked>
+          <span class="line" style="background: var(--kv-cache-start)"></span>
+          KV cache update start
+        </label>
+        <label class="legend-row">
+          <input id="showKvCacheEnd" type="checkbox" checked>
+          <span class="line" style="background: var(--kv-cache-end)"></span>
+          KV cache update end
+        </label>
+      </div>
+      <p class="hint">Drag on the chart to zoom.</p>
+    </aside>
+
+    <section>
+      <div class="chart-wrap">
+        <canvas id="chart" width="1500" height="640"></canvas>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Type</th>
+              <th>Device</th>
+              <th>Arm</th>
+              <th id="valueHeader0">X</th>
+              <th id="valueHeader1">Y</th>
+              <th id="valueHeader2">Z</th>
+              <th id="valueHeader3">W</th>
+              <th>Source</th>
+            </tr>
+          </thead>
+          <tbody id="rows"><tr><td class="empty" colspan="9">No data loaded.</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const fileInput = document.getElementById("fileInput");
+    const folderInput = document.getElementById("folderInput");
+    const fileSummary = document.getElementById("fileSummary");
+    const deviceFilter = document.getElementById("deviceFilter");
+    const armFilter = document.getElementById("armFilter");
+    const axisFilter = document.getElementById("axisFilter");
+    const valueHeaders = [
+      document.getElementById("valueHeader0"),
+      document.getElementById("valueHeader1"),
+      document.getElementById("valueHeader2"),
+      document.getElementById("valueHeader3"),
+    ];
+    const showAction = document.getElementById("showAction");
+    const showAllActions = document.getElementById("showAllActions");
+    const showAlignedActions = document.getElementById("showAlignedActions");
+    const showRelative = document.getElementById("showRelative");
+    const showObservation = document.getElementById("showObservation");
+    const showState = document.getElementById("showState");
+    const showHistory = document.getElementById("showHistory");
+    const showHistoryImage = document.getElementById("showHistoryImage");
+    const showHistoryRelative = document.getElementById("showHistoryRelative");
+    const showPredChunkStart = document.getElementById("showPredChunkStart");
+    const showPredChunkEnd = document.getElementById("showPredChunkEnd");
+    const showChunkSwitch = document.getElementById("showChunkSwitch");
+    const showQuery = document.getElementById("showQuery");
+    const showReference = document.getElementById("showReference");
+    const showInferenceStart = document.getElementById("showInferenceStart");
+    const showInferenceEnd = document.getElementById("showInferenceEnd");
+    const showInferenceActive = document.getElementById("showInferenceActive");
+    const showKvCacheStart = document.getElementById("showKvCacheStart");
+    const showKvCacheEnd = document.getElementById("showKvCacheEnd");
+    const resetZoom = document.getElementById("resetZoom");
+    const canvas = document.getElementById("chart");
+    const ctx = canvas.getContext("2d");
+    const rows = document.getElementById("rows");
+    const actionStat = document.getElementById("actionStat");
+    const allActionsStat = document.getElementById("allActionsStat");
+    const alignedActionsStat = document.getElementById("alignedActionsStat");
+    const relativeStat = document.getElementById("relativeStat");
+    const observationStat = document.getElementById("observationStat");
+    const stateStat = document.getElementById("stateStat");
+    const historyStat = document.getElementById("historyStat");
+    const historyRelativeStat = document.getElementById("historyRelativeStat");
+    const queryStat = document.getElementById("queryStat");
+    const referenceStat = document.getElementById("referenceStat");
+    const inferenceStartStat = document.getElementById("inferenceStartStat");
+    const inferenceEndStat = document.getElementById("inferenceEndStat");
+    const kvCacheStartStat = document.getElementById("kvCacheStartStat");
+    const kvCacheEndStat = document.getElementById("kvCacheEndStat");
+    const spanStat = document.getElementById("spanStat");
+
+    const INFERENCE_EVENT_TYPES = new Set([
+      "inference_start",
+      "inference_end",
+      "inference_active",
+      "kv_cache_update_start",
+      "kv_cache_update_end",
+      "pred_chunk_start",
+      "pred_chunk_end",
+      "chunk_switch",
+    ]);
+    const XYZ_EVENT_TYPES = new Set([
+      "action_xyz",
+      "all_actions",
+      "aligned_actions",
+      "relative_xyz",
+      "observation_xyz",
+      "state_xyz",
+      "history_xyz",
+      "history_image",
+      "history_relative_xyz",
+      "query_xyz",
+      "reference_xyz",
+      "continuous_state_xyz",
+    ]);
+    const JOINT14_AXIS_NAMES = [
+      "left_j0", "left_j1", "left_j2", "left_j3", "left_j4", "left_j5", "left_gripper",
+      "right_j0", "right_j1", "right_j2", "right_j3", "right_j4", "right_j5", "right_gripper",
+    ];
+
+    let records = [];
+    let zoom = null;
+    let dragStartX = null;
+    let hoverPoint = null;
+    let plottedPoints = [];
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
+    }
+
+    function uniqueSorted(values) {
+      return Array.from(new Set(values.filter(Boolean))).sort((a, b) => String(a).localeCompare(String(b)));
+    }
+
+    function formatNs(ns) {
+      if (!Number.isFinite(ns) || ns <= 0) return "";
+      const date = new Date(ns / 1e6);
+      const ms = String(date.getMilliseconds()).padStart(3, "0");
+      return `${date.toLocaleTimeString()}.${ms}`;
+    }
+
+    function formatDuration(ns) {
+      if (!Number.isFinite(ns)) return "";
+      const abs = Math.abs(ns);
+      if (abs >= 1e9) return `${(ns / 1e9).toFixed(3)} s`;
+      if (abs >= 1e6) return `${(ns / 1e6).toFixed(2)} ms`;
+      if (abs >= 1e3) return `${(ns / 1e3).toFixed(1)} us`;
+      return `${ns.toFixed(0)} ns`;
+    }
+
+    function formatValue(value) {
+      return Number.isFinite(value) ? value.toFixed(5) : "";
+    }
+
+    function isJointAxis(axis) {
+      return /^joint_\d+$/.test(axis);
+    }
+
+    function axisLabel(axis) {
+      if (!isJointAxis(axis)) return axis.toUpperCase();
+      const index = Number(axis.slice("joint_".length));
+      return JOINT14_AXIS_NAMES[index] || axis;
+    }
+
+    function updateValueHeaders(axis) {
+      if (!isJointAxis(axis)) {
+        ["X", "Y", "Z", "W"].forEach((label, index) => {
+          valueHeaders[index].textContent = label;
+        });
+        return;
+      }
+      valueHeaders[0].textContent = axisLabel(axis);
+      valueHeaders.slice(1).forEach(header => {
+        header.textContent = "-";
+      });
+    }
+
+    function formatFullTimestamp(ns) {
+      if (!Number.isFinite(ns) || ns <= 0) return "";
+      return `${formatNs(ns)} | ${Math.round(ns)} ns`;
+    }
+
+    function fillSelect(select, values, placeholder) {
+      const selected = select.value;
+      select.innerHTML = `<option value="">${placeholder}</option>` + values
+        .map(value => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`)
+        .join("");
+      if (values.includes(selected)) select.value = selected;
+    }
+
+    function rebuildFilters() {
+      fillSelect(deviceFilter, uniqueSorted(records.map(r => r.device_name)), "All devices");
+      fillSelect(armFilter, uniqueSorted(records.map(r => r.arm)), "All arms");
+    }
+
+    function isInferenceRecord(record) {
+      return INFERENCE_EVENT_TYPES.has(record.event_type);
+    }
+
+    function matchesDeviceFilter(record, device) {
+      if (!device) return true;
+      if (record.event_type === "chunk_switch") return true;
+      if (record.device_name === device) return true;
+      return isInferenceRecord(record) && record.device_name === `policy_inference_${device}`;
+    }
+
+    function filtered(ignoreZoom = false) {
+      const device = deviceFilter.value;
+      const arm = armFilter.value;
+      return records.filter(record => {
+        if (!matchesDeviceFilter(record, device)) return false;
+        if (arm && !isInferenceRecord(record) && record.arm !== arm) return false;
+        if (!ignoreZoom && zoom && (record.timestamp_ns < zoom[0] || record.timestamp_ns > zoom[1])) return false;
+        return true;
+      });
+    }
+
+    function domainFor(points) {
+      const times = points.map(p => p.timestamp_ns);
+      if (times.length === 0) return [0, 1];
+      let min = Math.min(...times);
+      let max = Math.max(...times);
+      if (zoom) return zoom;
+      if (min === max) {
+        min -= 1e9;
+        max += 1e9;
+      }
+      return [min, max];
+    }
+
+    function valueDomain(actions, allActions, alignedActions, relatives, observations, states, histories, historyImages, historyRelatives, queries, references, inferenceActives, axis) {
+      const values = [];
+      if (showAction.checked) values.push(...actions.map(p => Number(p[axis])));
+      if (showAllActions.checked) values.push(...allActions.map(p => Number(p[axis])));
+      if (showAlignedActions.checked) values.push(...alignedActions.map(p => Number(p[axis])));
+      if (showRelative.checked) values.push(...relatives.map(p => Number(p[axis])));
+      if (showObservation.checked) values.push(...observations.map(p => Number(p[axis])));
+      if (showState.checked) values.push(...states.map(p => Number(p[axis])));
+      if (showHistory.checked) values.push(...histories.map(p => Number(p[axis])));
+      if (showHistoryImage.checked) values.push(...historyImages.map(p => Number(p[axis])));
+      if (showHistoryRelative.checked) values.push(...historyRelatives.map(p => Number(p[axis])));
+      if (showQuery.checked) values.push(...queries.map(p => Number(p[axis])));
+      if (showReference.checked) values.push(...references.map(p => Number(p[axis])));
+      if (showInferenceActive.checked) {
+        values.push(...inferenceActives.map(p => inferenceActiveValue(p)));
+      }
+      const finite = values.filter(Number.isFinite);
+      if (finite.length === 0) return [-1, 1];
+      let min = Math.min(...finite);
+      let max = Math.max(...finite);
+      if (min === max) {
+        min -= 0.01;
+        max += 0.01;
+      }
+      const pad = Math.max((max - min) * 0.08, 1e-6);
+      return [min - pad, max + pad];
+    }
+
+    function drawSeries(points, axis, color, xFor, yFor, label) {
+      const finitePoints = points.filter(point => Number.isFinite(Number(point[axis])));
+      if (finitePoints.length === 0) return;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      finitePoints.forEach((point, idx) => {
+        const x = xFor(point.timestamp_ns);
+        const y = yFor(Number(point[axis]));
+        if (idx === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+
+      ctx.fillStyle = color;
+      finitePoints.forEach(point => {
+        const x = xFor(point.timestamp_ns);
+        const value = Number(point[axis]);
+        const y = yFor(value);
+        ctx.beginPath();
+        ctx.arc(x, y, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+        plottedPoints.push({ x, y, color, label, point, value });
+      });
+    }
+
+    // Distinct colors so overlapping predicted chunks from different inference
+    // timesteps can be told apart. Predicted chunks (chunk_length steps) often span
+    // longer than the interval between inferences, so consecutive chunks overlap in
+    // time; connecting all points as one series produces a misleading zigzag.
+    const CHUNK_PALETTE = [
+      "#db2777", "#0ea5e9", "#f97316", "#a855f7", "#16a34a",
+      "#eab308", "#ef4444", "#14b8a6", "#8b5cf6", "#0891b2",
+    ];
+
+    function drawChunkedSeries(points, orderPoints, axis, xFor, yFor, label, groupKey, isDashed = false) {
+      if (points.length === 0) return;
+      // Stable color per chunk: index chunks by their global (zoom-independent) order,
+      // so a chunk keeps the same color/number when you zoom in or out.
+      const orderKeys = Array.from(new Set(
+        (orderPoints && orderPoints.length ? orderPoints : points)
+          .map(point => Number(point[groupKey]))
+          .filter(Number.isFinite),
+      )).sort((a, b) => a - b);
+      const chunkOrderByKey = new Map(orderKeys.map((key, idx) => [key, idx]));
+      // Group by the inference that produced the chunk (prediction_timestamp_ns).
+      const groups = new Map();
+      points.forEach(point => {
+        const rawKey = Number(point[groupKey]);
+        const key = Number.isFinite(rawKey) ? rawKey : "na";
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(point);
+      });
+      const keys = Array.from(groups.keys()).sort((a, b) => Number(a) - Number(b));
+      keys.forEach((key) => {
+        const chunkOrder = chunkOrderByKey.has(key) ? chunkOrderByKey.get(key) : 0;
+        const color = CHUNK_PALETTE[chunkOrder % CHUNK_PALETTE.length];
+        // Order points within a chunk by their step index (temporal order within the
+        // chunk), falling back to timestamp when the step index is missing.
+        const group = groups.get(key).slice().sort((a, b) => {
+          const ai = Number(a.action_step_index);
+          const bi = Number(b.action_step_index);
+          if (Number.isFinite(ai) && Number.isFinite(bi) && ai !== bi) return ai - bi;
+          return a.timestamp_ns - b.timestamp_ns;
+        });
+        const finitePoints = group.filter(point => Number.isFinite(Number(point[axis])));
+        if (finitePoints.length === 0) return;
+
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.setLineDash(isDashed ? [8, 5] : []);
+        ctx.beginPath();
+        finitePoints.forEach((point, idx) => {
+          const x = xFor(point.timestamp_ns);
+          const y = yFor(Number(point[axis]));
+          if (idx === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.fillStyle = color;
+        const chunkLabel = `${label} #${chunkOrder + 1}`;
+        finitePoints.forEach(point => {
+          const x = xFor(point.timestamp_ns);
+          const value = Number(point[axis]);
+          const y = yFor(value);
+          ctx.beginPath();
+          ctx.arc(x, y, 3, 0, Math.PI * 2);
+          ctx.fill();
+          plottedPoints.push({ x, y, color, label: chunkLabel, point, value });
+        });
+      });
+    }
+
+    function inferenceActiveValue(point) {
+      const value = Number(point.value);
+      return Number.isFinite(value) ? value : 0.2;
+    }
+
+    function drawInferenceActivePoints(points, color, xFor, yFor) {
+      if (points.length === 0) return;
+      ctx.fillStyle = color;
+      points.forEach(point => {
+        const value = inferenceActiveValue(point);
+        const x = xFor(point.timestamp_ns);
+        const y = yFor(value);
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.fill();
+        plottedPoints.push({
+          x,
+          y,
+          color,
+          label: "inference active",
+          point,
+          value,
+          kind: "inference",
+        });
+      });
+    }
+
+    function drawInferenceMarkers(points, color, xFor, pad, plotH, label, isDashed = true) {
+      if (points.length === 0) return;
+      ctx.save();
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash(isDashed ? [4, 4] : []);
+      points.forEach(point => {
+        const markerColor = typeof color === "function" ? color(point) : color;
+        const x = xFor(point.timestamp_ns);
+        ctx.strokeStyle = markerColor;
+        ctx.beginPath();
+        ctx.moveTo(x, pad.top);
+        ctx.lineTo(x, pad.top + plotH);
+        ctx.stroke();
+        plottedPoints.push({
+          x,
+          y: pad.top + plotH / 2,
+          color: markerColor,
+          label,
+          point,
+          value: Number(point.inference_duration_ns),
+          kind: "inference",
+        });
+      });
+      ctx.restore();
+    }
+
+    function predChunkColor(point) {
+      const index = Number(point.pred_chunk_index);
+      if (!Number.isFinite(index)) return "#0ea5e9";
+      const palette = ["#0ea5e9", "#f97316", "#a855f7"];
+      return palette[Math.abs(Math.trunc(index) - 1) % palette.length];
+    }
+
+    function visibleAxisValues(groups, axis) {
+      const values = [];
+      groups.forEach(group => {
+        group.forEach(point => {
+          const value = Number(point[axis]);
+          if (Number.isFinite(value)) values.push(value);
+        });
+      });
+      return values;
+    }
+
+    function predChunkBandValue(orderIndex, count, meanValue, bandGap, direction) {
+      if (count <= 1) return meanValue;
+      const centeredOffset = orderIndex - (count - 1) / 2;
+      return meanValue + direction * centeredOffset * bandGap;
+    }
+
+    function predChunkBandDirection(values) {
+      if (values.length < 2) return 1;
+      return values[0] > values[values.length - 1] ? -1 : 1;
+    }
+
+    function pairPredChunkMarkers(starts, ends) {
+      const endByIndex = new Map();
+      ends.forEach(point => {
+        const index = Number(point.pred_chunk_index);
+        if (!Number.isFinite(index)) return;
+        const existing = endByIndex.get(index);
+        if (!existing || Number(point.timestamp_ns) < Number(existing.timestamp_ns)) {
+          endByIndex.set(index, point);
+        }
+      });
+      return starts
+        .map(start => {
+          const index = Number(start.pred_chunk_index);
+          if (!Number.isFinite(index)) return null;
+          const end = endByIndex.get(index);
+          if (!end) return null;
+          return { index, start, end };
+        })
+        .filter(Boolean)
+        .sort((a, b) => a.index - b.index);
+    }
+
+    function drawPredChunkBands(starts, ends, dataGroups, axis, xFor, yFor, yDomain) {
+      const pairs = pairPredChunkMarkers(starts, ends);
+      if (pairs.length === 0) return;
+
+      const values = visibleAxisValues(dataGroups, axis);
+      const meanValue = values.length > 0
+        ? values.reduce((sum, value) => sum + value, 0) / values.length
+        : (yDomain[0] + yDomain[1]) / 2;
+      const bandGap = Math.max((yDomain[1] - yDomain[0]) * 0.035, 1e-6);
+      const bandDirection = predChunkBandDirection(values);
+      const bandHalfHeightPx = 5;
+
+      ctx.save();
+      pairs.forEach((pair, orderIndex) => {
+        const startNs = Number(pair.start.timestamp_ns);
+        const endNs = Number(pair.end.timestamp_ns);
+        if (!Number.isFinite(startNs) || !Number.isFinite(endNs)) return;
+        const x0 = xFor(Math.min(startNs, endNs));
+        const x1 = xFor(Math.max(startNs, endNs));
+        const value = predChunkBandValue(
+          orderIndex,
+          pairs.length,
+          meanValue,
+          bandGap,
+          bandDirection,
+        );
+        const y = yFor(value);
+        const color = predChunkColor(pair.start);
+
+        ctx.globalAlpha = 0.2;
+        ctx.fillStyle = color;
+        ctx.fillRect(x0, y - bandHalfHeightPx, Math.max(x1 - x0, 2), bandHalfHeightPx * 2);
+
+        ctx.globalAlpha = 0.95;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(x0, y);
+        ctx.lineTo(x1, y);
+        ctx.stroke();
+
+        plottedPoints.push({
+          x: (x0 + x1) / 2,
+          y,
+          color,
+          label: "all actions chunk band",
+          point: pair.start,
+          value,
+          kind: "inference",
+        });
+      });
+      ctx.restore();
+    }
+
+    function tooltipLines(hit) {
+      const point = hit.point;
+      if (hit.kind === "inference") {
+        const lines = [
+          hit.label,
+          `time: ${formatFullTimestamp(Number(point.timestamp_ns))}`,
+        ];
+        if (point.device_name) lines.push(`device: ${point.device_name}`);
+        if (point.inference_phase) lines.push(`phase: ${point.inference_phase}`);
+        if (Number.isFinite(Number(hit.value))) {
+          lines.push(`value: ${formatValue(Number(hit.value))}`);
+        }
+        const durationNs = Number(point.inference_duration_ns ?? point.kv_cache_update_duration_ns);
+        if (Number.isFinite(durationNs)) lines.push(`duration: ${formatDuration(durationNs)}`);
+        const timingFields = [
+          ["policy_input_preprocess_ns", "input preprocess"],
+          ["policy_h2d_ns", "H2D"],
+          ["policy_cuda_forward_ns", "CUDA forward"],
+          ["policy_output_sync_d2h_ns", "output sync/D2H"],
+          ["policy_postprocess_ns", "postprocess"],
+          ["policy_policy_predict_ns", "policy predict"],
+        ];
+        timingFields.forEach(([field, label]) => {
+          const value = Number(point[field]);
+          if (Number.isFinite(value)) lines.push(`${label}: ${formatDuration(value)}`);
+        });
+        if (point.success != null) lines.push(`success: ${point.success}`);
+        if (point.exception_type) lines.push(`exception: ${point.exception_type}`);
+        if (point.exception_message) lines.push(`message: ${point.exception_message}`);
+        if (point.action_index != null) lines.push(`action_index: ${point.action_index}`);
+        if (point.pred_chunk_index != null) lines.push(`pred_chunk_index: ${point.pred_chunk_index}`);
+        if (point.chunk_length != null) lines.push(`chunk_length: ${point.chunk_length}`);
+        if (point.history_frames != null) lines.push(`history_frames: ${point.history_frames}`);
+        if (point.pose_frames != null) lines.push(`pose_frames: ${point.pose_frames}`);
+        if (point.aligned_chunk_length != null) {
+          lines.push(`aligned_chunk_length: ${point.aligned_chunk_length}`);
+        }
+        if (point.original_start_offset != null) {
+          lines.push(`original_start_offset: ${Number(point.original_start_offset).toFixed(3)}`);
+        }
+        if (point.original_step_interval_ns != null) {
+          lines.push(`original_step_interval_ms: ${(Number(point.original_step_interval_ns) / 1e6).toFixed(3)}`);
+        }
+        if (point.aligned_step_interval_ns != null) {
+          lines.push(`aligned_step_interval_ms: ${(Number(point.aligned_step_interval_ns) / 1e6).toFixed(3)}`);
+        }
+        return lines;
+      }
+      const lines = [
+        hit.label,
+        `value: ${formatValue(hit.value)}`,
+        `time: ${formatFullTimestamp(Number(point.timestamp_ns))}`,
+      ];
+      if (point.device_name) lines.push(`device: ${point.device_name}`);
+      if (point.arm) lines.push(`arm: ${point.arm}`);
+      if (point.pred_chunk_index != null) lines.push(`pred_chunk_index: ${point.pred_chunk_index}`);
+      if (point.action_step_index != null) lines.push(`action_step_index: ${point.action_step_index}`);
+      if (point.chunk_stage) lines.push(`chunk_stage: ${point.chunk_stage}`);
+      if (point.chunk_length != null) lines.push(`chunk_length: ${point.chunk_length}`);
+      if (point.original_chunk_length != null) {
+        lines.push(`original_chunk_length: ${point.original_chunk_length}`);
+      }
+      if (point.aligned_chunk_length != null) {
+        lines.push(`aligned_chunk_length: ${point.aligned_chunk_length}`);
+      }
+      if (point.original_start_offset != null) {
+        lines.push(`original_start_offset: ${Number(point.original_start_offset).toFixed(3)}`);
+      }
+      if (point.original_action_offset != null) {
+        lines.push(`original_action_offset: ${Number(point.original_action_offset).toFixed(3)}`);
+      }
+      if (point.original_step_interval_ns != null) {
+        lines.push(`original_step_interval_ms: ${(Number(point.original_step_interval_ns) / 1e6).toFixed(3)}`);
+      }
+      if (point.aligned_step_interval_ns != null) {
+        lines.push(`aligned_step_interval_ms: ${(Number(point.aligned_step_interval_ns) / 1e6).toFixed(3)}`);
+      }
+      if (point.pred_chunk_timestamp_source) {
+        lines.push(`timestamp_source: ${point.pred_chunk_timestamp_source}`);
+      }
+      if (point.prediction_timestamp_ns != null) {
+        lines.push(`pred_time: ${formatFullTimestamp(Number(point.prediction_timestamp_ns))}`);
+      }
+      return lines;
+    }
+
+    function drawTooltip(hit) {
+      if (!hit) return;
+
+      ctx.save();
+      ctx.strokeStyle = hit.color;
+      ctx.fillStyle = "#ffffff";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(hit.x, hit.y, 7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      const lines = tooltipLines(hit);
+      ctx.font = "13px sans-serif";
+      const paddingX = 10;
+      const paddingY = 8;
+      const lineHeight = 18;
+      const textWidth = Math.max(...lines.map(line => ctx.measureText(line).width));
+      const boxW = textWidth + paddingX * 2;
+      const boxH = lines.length * lineHeight + paddingY * 2;
+      let boxX = hit.x + 12;
+      let boxY = hit.y - boxH - 10;
+      if (boxX + boxW > canvas.width - 8) boxX = hit.x - boxW - 12;
+      if (boxY < 8) boxY = hit.y + 12;
+      if (boxY + boxH > canvas.height - 8) boxY = canvas.height - boxH - 8;
+
+      ctx.fillStyle = "rgba(255, 255, 255, 0.96)";
+      ctx.strokeStyle = "#d7dce2";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(boxX, boxY, boxW, boxH, 7);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = "#17202a";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      lines.forEach((line, idx) => {
+        ctx.fillText(line, boxX + paddingX, boxY + paddingY + idx * lineHeight);
+      });
+      ctx.restore();
+    }
+
+    function findHoverPoint(event) {
+      const rect = canvas.getBoundingClientRect();
+      const x = (event.clientX - rect.left) * (canvas.width / rect.width);
+      const y = (event.clientY - rect.top) * (canvas.height / rect.height);
+      const scale = canvas.width / rect.width;
+      const threshold = 11 * scale;
+      let best = null;
+      let bestDist = Infinity;
+      plottedPoints.forEach(point => {
+        const dist = Math.hypot(point.x - x, point.y - y);
+        if (dist < bestDist && dist <= threshold) {
+          best = point;
+          bestDist = dist;
+        }
+      });
+      return best;
+    }
+
+    function renderTable(points, axis) {
+      if (points.length === 0) {
+        rows.innerHTML = `<tr><td class="empty" colspan="9">No selected topic records match the current filters.</td></tr>`;
+        return;
+      }
+      const jointAxis = isJointAxis(axis);
+      rows.innerHTML = points
+        .slice()
+        .sort((a, b) => b.timestamp_ns - a.timestamp_ns)
+        .slice(0, 300)
+        .map(record => {
+          if (INFERENCE_EVENT_TYPES.has(record.event_type)) {
+            const phase = record.inference_phase || "";
+            const durationNs = Number(record.inference_duration_ns ?? record.kv_cache_update_duration_ns);
+            const duration = Number.isFinite(durationNs)
+              ? formatDuration(durationNs)
+              : "";
+            const extra = [phase, duration, record.success != null ? `ok=${record.success}` : ""]
+              .filter(Boolean)
+              .join(" | ");
+            return `
+          <tr>
+            <td>${escapeHtml(formatNs(record.timestamp_ns))}</td>
+            <td>${escapeHtml(record.event_type)}</td>
+            <td>${escapeHtml(record.device_name)}</td>
+            <td>${escapeHtml(extra)}</td>
+            <td>-</td>
+            <td>-</td>
+            <td>-</td>
+            <td>-</td>
+            <td>${escapeHtml(record.source)}</td>
+          </tr>`;
+          }
+          const jointValue = Number(record[axis]);
+          const values = jointAxis
+            ? [formatValue(jointValue), "-", "-", "-"]
+            : [
+              formatValue(Number(record.x)),
+              formatValue(Number(record.y)),
+              formatValue(Number(record.z)),
+              formatValue(Number(record.w)),
+            ];
+          return `
+          <tr>
+            <td>${escapeHtml(formatNs(record.timestamp_ns))}</td>
+            <td>${escapeHtml(record.event_type)}</td>
+            <td>${escapeHtml(record.device_name)}</td>
+            <td>${escapeHtml(record.arm)}</td>
+            <td>${escapeHtml(values[0])}</td>
+            <td>${escapeHtml(values[1])}</td>
+            <td>${escapeHtml(values[2])}</td>
+            <td>${escapeHtml(values[3])}</td>
+            <td>${escapeHtml(record.source)}</td>
+          </tr>`;
+        })
+        .join("");
+    }
+
+    function selectedEventTypes() {
+      const types = [];
+      if (showAction.checked) types.push("action_xyz");
+      if (showAllActions.checked) types.push("all_actions");
+      if (showAlignedActions.checked) types.push("aligned_actions");
+      if (showRelative.checked) types.push("relative_xyz");
+      if (showObservation.checked) types.push("observation_xyz");
+      if (showState.checked) types.push("state_xyz");
+      if (showHistory.checked) types.push("history_xyz");
+      if (showHistoryImage.checked) types.push("history_image");
+      if (showHistoryRelative.checked) types.push("history_relative_xyz");
+      if (showPredChunkStart.checked) types.push("pred_chunk_start");
+      if (showPredChunkEnd.checked) types.push("pred_chunk_end");
+      if (showChunkSwitch.checked) types.push("chunk_switch");
+      if (showQuery.checked) types.push("query_xyz");
+      if (showReference.checked) types.push("reference_xyz");
+      if (showInferenceStart.checked) types.push("inference_start");
+      if (showInferenceEnd.checked) types.push("inference_end");
+      if (showInferenceActive.checked) types.push("inference_active");
+      if (showKvCacheStart.checked) types.push("kv_cache_update_start");
+      if (showKvCacheEnd.checked) types.push("kv_cache_update_end");
+      return new Set(types);
+    }
+
+    function render(updateTable = true) {
+      const axis = axisFilter.value;
+      updateValueHeaders(axis);
+      const base = filtered(true).sort((a, b) => a.timestamp_ns - b.timestamp_ns);
+      const visible = filtered(false).sort((a, b) => a.timestamp_ns - b.timestamp_ns);
+      const actions = visible.filter(r => r.event_type === "action_xyz");
+      const allActions = visible.filter(r => r.event_type === "all_actions");
+      const allActionsAll = base.filter(r => r.event_type === "all_actions");
+      const alignedActions = visible.filter(r => r.event_type === "aligned_actions");
+      const alignedActionsAll = base.filter(r => r.event_type === "aligned_actions");
+      const relatives = visible.filter(r => r.event_type === "relative_xyz");
+      const observations = visible.filter(r => r.event_type === "observation_xyz");
+      const states = visible.filter(r => r.event_type === "state_xyz");
+      const histories = visible.filter(r => r.event_type === "history_xyz");
+      const historyImages = visible.filter(r => r.event_type === "history_image");
+      const historyRelatives = visible.filter(r => r.event_type === "history_relative_xyz");
+      const queries = visible.filter(r => r.event_type === "query_xyz");
+      const references = visible.filter(r => r.event_type === "reference_xyz");
+      const inferenceStarts = visible.filter(r => r.event_type === "inference_start");
+      const inferenceEnds = visible.filter(r => r.event_type === "inference_end");
+      const inferenceActives = visible.filter(r => r.event_type === "inference_active");
+      const kvCacheStarts = visible.filter(r => r.event_type === "kv_cache_update_start");
+      const kvCacheEnds = visible.filter(r => r.event_type === "kv_cache_update_end");
+      const predChunkStarts = visible.filter(r => r.event_type === "pred_chunk_start");
+      const predChunkEnds = visible.filter(r => r.event_type === "pred_chunk_end");
+      const chunkSwitches = visible.filter(r => r.event_type === "chunk_switch");
+      const timeDomain = domainFor(base);
+      const yDomain = valueDomain(
+        actions,
+        allActions,
+        alignedActions,
+        relatives,
+        observations,
+        states,
+        histories,
+        historyImages,
+        historyRelatives,
+        queries,
+        references,
+        inferenceActives,
+        axis,
+      );
+
+      const width = canvas.width;
+      const height = canvas.height;
+      const pad = { left: 72, right: 30, top: 28, bottom: 46 };
+      const plotW = width - pad.left - pad.right;
+      const plotH = height - pad.top - pad.bottom;
+      const xFor = ns => pad.left + ((ns - timeDomain[0]) / Math.max(timeDomain[1] - timeDomain[0], 1)) * plotW;
+      const yFor = value => pad.top + (1 - ((value - yDomain[0]) / Math.max(yDomain[1] - yDomain[0], 1e-9))) * plotH;
+      plottedPoints = [];
+
+      ctx.clearRect(0, 0, width, height);
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, width, height);
+
+      ctx.strokeStyle = "#e8ebf0";
+      ctx.lineWidth = 1;
+      ctx.font = "12px sans-serif";
+      ctx.fillStyle = "#657182";
+      for (let i = 0; i <= 6; i++) {
+        const x = pad.left + (plotW * i / 6);
+        ctx.beginPath();
+        ctx.moveTo(x, pad.top);
+        ctx.lineTo(x, height - pad.bottom);
+        ctx.stroke();
+        ctx.textAlign = "center";
+        ctx.fillText(formatNs(timeDomain[0] + (timeDomain[1] - timeDomain[0]) * i / 6), x, height - 17);
+      }
+      for (let i = 0; i <= 5; i++) {
+        const value = yDomain[0] + (yDomain[1] - yDomain[0]) * i / 5;
+        const y = yFor(value);
+        ctx.beginPath();
+        ctx.moveTo(pad.left, y);
+        ctx.lineTo(width - pad.right, y);
+        ctx.stroke();
+        ctx.textAlign = "right";
+        ctx.fillText(formatValue(value), pad.left - 10, y + 4);
+      }
+
+      if (showAction.checked) drawSeries(actions, axis, "#0f766e", xFor, yFor, `action ${axisLabel(axis)}`);
+      if (showAllActions.checked) drawChunkedSeries(allActions, allActionsAll, axis, xFor, yFor, "all actions chunk", "pred_chunk_index");
+      if (showAlignedActions.checked) {
+        drawChunkedSeries(
+          alignedActions,
+          alignedActionsAll,
+          axis,
+          xFor,
+          yFor,
+          "aligned actions chunk",
+          "pred_chunk_index",
+          true,
+        );
+      }
+      if (showRelative.checked) drawSeries(relatives, axis, "#ea580c", xFor, yFor, `relative ${axisLabel(axis)}`);
+      if (showObservation.checked) drawSeries(observations, axis, "#2563eb", xFor, yFor, `observation ${axisLabel(axis)}`);
+      if (showState.checked) drawSeries(states, axis, "#7c3aed", xFor, yFor, `state ${axisLabel(axis)}`);
+      if (showHistory.checked) drawSeries(histories, axis, "#b45309", xFor, yFor, `history ${axisLabel(axis)}`);
+      if (showHistoryImage.checked) drawSeries(historyImages, axis, "#9333ea", xFor, yFor, `history image ${axisLabel(axis)}`);
+      if (showHistoryRelative.checked) drawSeries(historyRelatives, axis, "#0891b2", xFor, yFor, `history relative ${axisLabel(axis)}`);
+      if (showQuery.checked) drawSeries(queries, axis, "#16a34a", xFor, yFor, `query ${axisLabel(axis)}`);
+      if (showReference.checked) drawSeries(references, axis, "#be123c", xFor, yFor, `reference ${axisLabel(axis)}`);
+      if (showInferenceStart.checked) {
+        drawInferenceMarkers(inferenceStarts, "#15803d", xFor, pad, plotH, "inference start");
+      }
+      if (showInferenceEnd.checked) {
+        drawInferenceMarkers(inferenceEnds, "#dc2626", xFor, pad, plotH, "inference end");
+      }
+      if (showInferenceActive.checked) {
+        drawInferenceActivePoints(inferenceActives, "#94a3b8", xFor, yFor);
+      }
+      if (showKvCacheStart.checked) {
+        drawInferenceMarkers(kvCacheStarts, "#ef4444", xFor, pad, plotH, "KV cache update start", false);
+      }
+      if (showKvCacheEnd.checked) {
+        drawInferenceMarkers(kvCacheEnds, "#7f1d1d", xFor, pad, plotH, "KV cache update end");
+      }
+      if (showPredChunkStart.checked && showPredChunkEnd.checked) {
+        drawPredChunkBands(
+          predChunkStarts,
+          predChunkEnds,
+          [actions, allActions, alignedActions, relatives, observations, states, histories, historyImages, historyRelatives, queries, references],
+          axis,
+          xFor,
+          yFor,
+          yDomain,
+        );
+      }
+      if (showChunkSwitch.checked) {
+        drawInferenceMarkers(chunkSwitches, "#000000", xFor, pad, plotH, "chunk switch", false);
+      }
+      drawTooltip(hoverPoint);
+
+      actionStat.textContent = String(actions.length);
+      allActionsStat.textContent = String(allActions.length);
+      alignedActionsStat.textContent = String(alignedActions.length);
+      relativeStat.textContent = String(relatives.length);
+      observationStat.textContent = String(observations.length);
+      stateStat.textContent = String(states.length);
+      historyStat.textContent = String(histories.length);
+      historyRelativeStat.textContent = String(historyRelatives.length);
+      queryStat.textContent = String(queries.length);
+      referenceStat.textContent = String(references.length);
+      inferenceStartStat.textContent = String(inferenceStarts.length);
+      inferenceEndStat.textContent = String(inferenceEnds.length);
+      kvCacheStartStat.textContent = String(kvCacheStarts.length);
+      kvCacheEndStat.textContent = String(kvCacheEnds.length);
+      spanStat.textContent = formatDuration(timeDomain[1] - timeDomain[0]);
+      if (updateTable) {
+        const selectedTypes = selectedEventTypes();
+        renderTable(visible.filter(record => selectedTypes.has(record.event_type)), axis);
+      }
+    }
+
+    function isJsonlLikeFile(file) {
+      return /\.(jsonl|log|txt)$/i.test(file.name) || file.type === "application/json";
+    }
+
+    function displayFileName(file) {
+      return file.webkitRelativePath || file.name;
+    }
+
+    function joint14Positions(record) {
+      if (record.vector_layout !== "joint14" || !Array.isArray(record.joint_positions)) {
+        return null;
+      }
+      if (record.joint_positions.length !== JOINT14_AXIS_NAMES.length) return null;
+      const values = record.joint_positions.map(Number);
+      return values.every(Number.isFinite) ? values : null;
+    }
+
+    function isImageTensor(record, jointPositions) {
+      return !jointPositions
+        && record.vector_kind === "state"
+        && Number(record.vector_dim) > 1024;
+    }
+
+    function isLegacyRoboTwinJoint14(record, jointPositions) {
+      return !jointPositions
+        && /^robotwinsimrobot/i.test(String(record.device_name || ""))
+        && Number(record.vector_dim) === JOINT14_AXIS_NAMES.length;
+    }
+
+    async function readFiles(files) {
+      const readableFiles = files.filter(isJsonlLikeFile);
+      const loaded = [];
+      for (const file of readableFiles) {
+        const fileName = displayFileName(file);
+        const text = await file.text();
+        text.split(/\r?\n/).forEach((line, index) => {
+          const trimmed = line.trim();
+          if (!trimmed) return;
+          try {
+            const record = JSON.parse(trimmed);
+            const eventType = record.event_type === "continuous_state_xyz"
+              ? "state_xyz"
+              : record.event_type;
+            const allowed = XYZ_EVENT_TYPES.has(eventType) || INFERENCE_EVENT_TYPES.has(eventType);
+            if (!allowed) return;
+            const timestamp = Number(record.timestamp_ns);
+            if (!Number.isFinite(timestamp) || timestamp <= 0) return;
+            const base = {
+              ...record,
+              event_type: eventType,
+              timestamp_ns: timestamp,
+              _file: fileName,
+              _line: index + 1,
+            };
+            if (INFERENCE_EVENT_TYPES.has(eventType)) {
+              loaded.push(base);
+              return;
+            }
+            const jointPositions = joint14Positions(record);
+            // Historical logs could contain camera RGB values as state_xyz when
+            // a camera name also contained "robot". They are not pose samples.
+            if (isImageTensor(record, jointPositions)) return;
+            // Legacy joint14 traces kept only x/y/z/w aliases for q0/q1/q2/q7.
+            // They cannot be truthfully rendered as either Cartesian or full joint data.
+            if (isLegacyRoboTwinJoint14(record, jointPositions)) return;
+            const normalized = {
+              ...base,
+              x: Number(record.x),
+              y: Number(record.y),
+              z: Number(record.z),
+              w: Number(record.w ?? record.width ?? record.gripper_width),
+            };
+            if (jointPositions) {
+              normalized.joint_positions = jointPositions;
+              jointPositions.forEach((value, jointIndex) => {
+                normalized[`joint_${jointIndex}`] = value;
+              });
+            }
+            loaded.push(normalized);
+          } catch (error) {
+            console.warn(`Skipping ${fileName}:${index + 1}`, error);
+          }
+        });
+      }
+      const plotRecords = loaded.filter(
+        r => INFERENCE_EVENT_TYPES.has(r.event_type)
+          || (Number.isFinite(r.x) && Number.isFinite(r.y) && Number.isFinite(r.z))
+          || joint14Positions(r) !== null,
+      );
+      records = plotRecords.sort((a, b) => a.timestamp_ns - b.timestamp_ns);
+      zoom = null;
+      const inferenceCount = records.filter(r => INFERENCE_EVENT_TYPES.has(r.event_type)).length;
+      const jointCount = records.filter(r => joint14Positions(r) !== null).length;
+      const xyzCount = records.filter(
+        r => !INFERENCE_EVENT_TYPES.has(r.event_type)
+          && joint14Positions(r) === null
+          && Number.isFinite(r.x)
+          && Number.isFinite(r.y)
+          && Number.isFinite(r.z),
+      ).length;
+      if (jointCount > 0 && xyzCount === 0) axisFilter.value = "joint_0";
+      fileSummary.textContent = `${records.length} records loaded (${xyzCount} xyzw, ${jointCount} joint14, ${inferenceCount} inference) from ${readableFiles.length} file(s).`;
+      rebuildFilters();
+      render();
+    }
+
+    function canvasXToNs(clientX) {
+      const rect = canvas.getBoundingClientRect();
+      const x = (clientX - rect.left) * (canvas.width / rect.width);
+      const base = filtered(true);
+      const domain = domainFor(base);
+      const padLeft = 72;
+      const padRight = 30;
+      const ratio = Math.min(1, Math.max(0, (x - padLeft) / (canvas.width - padLeft - padRight)));
+      return domain[0] + ratio * (domain[1] - domain[0]);
+    }
+
+    function clearHoverAndRender() {
+      hoverPoint = null;
+      render();
+    }
+
+    fileInput.addEventListener("change", () => readFiles(Array.from(fileInput.files || [])));
+    folderInput.addEventListener("change", () => readFiles(Array.from(folderInput.files || [])));
+    deviceFilter.addEventListener("change", clearHoverAndRender);
+    armFilter.addEventListener("change", clearHoverAndRender);
+    axisFilter.addEventListener("change", clearHoverAndRender);
+    showAction.addEventListener("change", clearHoverAndRender);
+    showAllActions.addEventListener("change", clearHoverAndRender);
+    showAlignedActions.addEventListener("change", clearHoverAndRender);
+    showRelative.addEventListener("change", clearHoverAndRender);
+    showObservation.addEventListener("change", clearHoverAndRender);
+    showState.addEventListener("change", clearHoverAndRender);
+    showHistory.addEventListener("change", clearHoverAndRender);
+    showHistoryImage.addEventListener("change", clearHoverAndRender);
+    showHistoryRelative.addEventListener("change", clearHoverAndRender);
+    showPredChunkStart.addEventListener("change", clearHoverAndRender);
+    showPredChunkEnd.addEventListener("change", clearHoverAndRender);
+    showChunkSwitch.addEventListener("change", clearHoverAndRender);
+    showQuery.addEventListener("change", clearHoverAndRender);
+    showReference.addEventListener("change", clearHoverAndRender);
+    showInferenceStart.addEventListener("change", clearHoverAndRender);
+    showInferenceEnd.addEventListener("change", clearHoverAndRender);
+    showInferenceActive.addEventListener("change", clearHoverAndRender);
+    showKvCacheStart.addEventListener("change", clearHoverAndRender);
+    showKvCacheEnd.addEventListener("change", clearHoverAndRender);
+    resetZoom.addEventListener("click", () => {
+      zoom = null;
+      clearHoverAndRender();
+    });
+    canvas.addEventListener("mousedown", event => {
+      dragStartX = event.clientX;
+    });
+    canvas.addEventListener("mousemove", event => {
+      hoverPoint = findHoverPoint(event);
+      render(false);
+    });
+    canvas.addEventListener("mouseleave", () => {
+      hoverPoint = null;
+      render(false);
+    });
+    window.addEventListener("mouseup", event => {
+      if (dragStartX == null) return;
+      const start = canvasXToNs(dragStartX);
+      const end = canvasXToNs(event.clientX);
+      dragStartX = null;
+      if (Math.abs(end - start) > 1e6) {
+        zoom = [Math.min(start, end), Math.max(start, end)];
+        render();
+      }
+    });
+
+    render();
+  </script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+device_manager:
+  type: synchronized
+  sync_mode: camera_align
+  params:
+    config_path: ${hydra:runtime.output_dir}/config_resolved.yaml

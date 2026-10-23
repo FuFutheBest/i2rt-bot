@@ -1,0 +1,7 @@
+interface:
+  display_name: "Infer Rollout Episode Control"
+  short_description: "Audit safe episode keyboard switching."
+  default_prompt: "Use $infer-rollout-episode-control to add keyboard episode switching without leaking policy or command state."
+
+policy:
+  allow_implicit_invocation: true

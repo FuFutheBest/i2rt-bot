@@ -1,0 +1,195 @@
+# @package _global_
+
+# Native FasterWAM C4 launch config. Keep this as a complete rollout config so
+# device preflight and runtime bindings do not depend on another model.
+defaults:
+  - /devices/infer@devices: infer_rizon_fisheye_umi3_dual_fastwam
+  - /device_manager: camera_sync
+  - /action_executor: base_auto_drop
+  - /consumer: default
+  - /runtime: default
+  - _self_
+
+device_manager:
+  device_manager:
+    master_device_class_id: 0
+    params:
+      buffer_size: 500
+
+shared:
+  summary_shm_name: device_summary_data
+
+metadata:
+  workflow_kind: fastwam
+  policy_class: FastWAMPolicy
+  hardware_required: true
+  status: available
+  supported_by:
+    - control_panel
+    - direct
+  label: FasterWAM native dual-arm
+  model_family: fastwam
+  model_variant: fasterwam
+
+camera:
+  left_capture_id: ${oc.env:SUPERINFERENCE_CAMERA_LEFT_CAPTURE_ID,2}
+  right_capture_id: ${oc.env:SUPERINFERENCE_CAMERA_RIGHT_CAPTURE_ID,4}
+
+global_settings:
+  log_level: INFO
+  restart_on_failure: false
+  max_restart_attempts: 0
+  restart_delay: 2.0
+
+hydra:
+  run:
+    dir: .
+  output_subdir: null
+  job_logging:
+    handlers:
+      file:
+        filename: ${hydra.runtime.cwd}/logs/${hydra.job.name}.log
+
+summary_shm: device_summary_data
+
+profiling:
+  mode: off
+  resources:
+    enabled: false
+  server:
+    output:
+      root: results/profiles
+      run_id: fastwam-server
+  client:
+    output:
+      root: results/profiles
+      run_id: fastwam-client
+
+policy:
+  class: FastWAMPolicy
+  params:
+    model_variant: fasterwam
+    # The C4 export is a concrete weights file rather than a checkpoint root.
+    ckpt_path: /home/noematrix/fastwam_ckpt/junlin_ckpt/disassemble_blocks/fastwam_posttrain_disassemble_blocks_2corrections_2overall_20260911_trim15_15_from_c4_noe0_v5a1_0914/checkpoints/weights/step_025000.pt
+    task: "Disassemble blocks and place sections on table"
+    condition_history_frames: 1
+    obs_horizon: 1
+    action_infer_mode: one_pass_future_cache
+    action_video_attention_mode: full_video
+    enforce_checkpoint_infer_mode: true
+    # FasterWAM checkpoint poses are expressed in its UMI tool frame.
+    tcp_umi_json_path: calibration/tcp_to_umi_transform.json
+    num_inference_steps: 10
+    c4_video_denoise_steps: 0
+    # C4 video follows its checkpoint preset, independently of action steps.
+    c4_video_num_inference_steps: 2
+    c4_reverse_video_timestep: false
+    host: 127.0.0.1
+    port: 18090
+    device: cuda
+    param_dtype: bf16
+    # NMX joins checkpoint-owned model IDs below this Git-ignored local root.
+    model_base_path: .superinference/local/model-cache
+    load_text_encoder: true
+    skip_pretrain_backbone_load: true
+    cache_prompt_embeddings: true
+    prompt_cache_max_entries: 8
+    torch_compile:
+      enabled: true
+      mode: reduce-overhead
+      dynamic: false
+      fullgraph: false
+    warm_up_on_load: true
+    warmup_requests: 3
+    max_abs_normalized_action: 5.0
+    crop_input_to_aspect: [3, 4]
+    camera_devices:
+      - "WebCameraOpenPi_0"
+      - "WebCameraOpenPi_1"
+    robot_device: RizonRobot_2
+    gripper_max_width: 0.0925319933860716
+    normalize_gripper_width: false
+    clip_gripper_width: true
+    enable_rtc: true
+    rtc_max_guidance_weight: 15.0
+    rtc_guidance_full_steps_override: null
+    rtc_delay_margin_steps: 2
+    rtc_use_vjp: false
+    reverse_temporal_chunks: false
+    execution_fps: ${policy.control_fps}
+    chunk_length: ${policy.chunk_length}
+  fps: 1.5
+  control_fps: 30.0
+  chunk_length: 48
+  obs:
+    devices:
+      - "WebCameraOpenPi_0"
+      - "WebCameraOpenPi_1"
+      - RizonRobot_2
+  controls:
+    - endpoint:
+        device: RizonRobot
+        device_class_id: 2
+        port: command
+      shape: [16]
+      dtype: float64
+  infer_rollout:
+    enabled: false
+    summary_shm_name: ${summary_shm}
+    output_dir: "data/rollout_data/fasterwam"
+    save_interval: 0.001
+    start_idx: 0
+    image_size: null
+    async_write: true
+    queue_size: 50000
+    robot_type: "Rizon"
+    task: ${policy.params.task}
+    ready_timeout: 10.0
+    auto_start: false
+    anomaly_config_path: "configs/anomaly_config/rizon_fisheye_umi3.yaml"
+    policy_outputs:
+      value:
+        name: "policy_value_estimation"
+        device_type: "PolicyValue"
+        buffer_size: 100
+        dtype: "float64"
+        enabled: false
+      q_value:
+        name: "policy_q_value_estimation"
+        device_type: "PolicyQValue"
+        buffer_size: 100
+        dtype: "float64"
+        enabled: false
+      q_value_timestamps:
+        name: "policy_q_value_timestamps"
+        device_type: "PolicyQValueTimestamps"
+        buffer_size: 100
+        dtype: "int64"
+        enabled: false
+      action_chunk:
+        name: "action_chunk"
+        device_type: "ActionChunk"
+        buffer_size: 200
+        dtype: "float64"
+        enabled: true
+    control_shms: ${policy.controls}
+    episode_control:
+      enabled: true
+      success_key: "s"
+      failure_key: "f"
+      discard_key: "d"
+      auto_restart: true
+      home_wait_time: 5.0
+  observation_recorder:
+    enabled: true
+    output_dir: logs/offline_observations/fasterwam
+    fps: 30.0
+    queue_size: 512
+    compress: false
+    superoffline_reviewed_source_profile: rizon-umi3-fisheye-openpi-rgb.v2
+    calibration_files:
+      tcp_to_umi: calibration/tcp_to_umi_transform.json
+      left_base_to_world: calibration/left_base_to_world.json
+      right_base_to_world: calibration/right_base_to_world.json
+      left_gripper: configs/devices/calibration/lktech_gripper/LKTech-Gripper-1_2_id1_calibration.json
+      right_gripper: configs/devices/calibration/lktech_gripper/LKTech-Gripper-2_2_id1_calibration.json

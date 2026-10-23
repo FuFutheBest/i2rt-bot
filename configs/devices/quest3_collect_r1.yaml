@@ -1,0 +1,309 @@
+# NEDF3 R1-schema data-collection device list for the Quest3/Flexiv/YAM rig.
+# Use with incubator/r1/async_data_saver_NEDF3_r1.py; topic layout is defined in
+# docs/R1遥操作系统数据样例（NEDF3）.md.
+# Camera roles: camera_0=inhand_right, camera_1=inhand_left, camera_2=head; ZED is
+# operator FPV only (not recorded). Cameras are pinned by /dev/v4l/by-path so OS
+# /dev/video index re-enumeration doesn't matter.
+
+devices:
+  # ---- ZED stereo: operator FPV only (NOT recorded; saver ignores it) ----
+- class: "ZedStereoDevice"
+  device_class_id: 0
+  state_feedback:
+    fps: 60.0
+    buffer_size: 100
+    hardware_latency_ms: 20.0
+    format:
+      shape: [376, 1344, 3]      # HD720 side-by-side stereo (left | right)
+      dtype: "uint8"
+      type: rgb
+  zed_resolution: "VGA"
+  camera_fps: 60
+  disable_self_calib: true
+
+  # ---- recording cameras (dataset): UVC USB "4K U3 Camera" via cv2.VideoCapture ----
+- class: "WebCameraDevice"
+  device_class_id: 1                   # camera_0 = inhand_right (openMV, hub port 4)
+  state_feedback:
+    fps: 30.0
+    buffer_size: 100
+    hardware_latency_ms: 30.0
+    format:
+      shape: [360, 640, 3]      # [height, width, channels]
+      dtype: "uint8"
+      type: rgb
+  capture_id: ${camera.right_capture_id}
+  backend: 200                   # cv2.CAP_V4L2
+  fourcc: "MJPG"                 # 3 UVC cams on one bus need MJPG (YUYV blows bandwidth)
+    # USB-bus startup: explicit per-camera delay, retry open/warm-up, discard more frames.
+  open_retries: 5
+  open_retry_delay_s: 1.5
+  open_delay_s: 0.0
+  warmup_frames: 20
+  post_open_settle_s: 0.3
+  auto_exposure: 3         # 3 = auto exposure; use 1 + exposure for a fixed value
+  auto_wb: 1               # 1 = auto white balance on
+  brightness: 80           # 0..255
+  contrast: 35             # 0..255
+  saturation: 110          # 0..127
+  hue: 0                   # -18000..18000
+  backlight: 1             # 0..1 toggle
+  gain: 102                # 0..767 (auto_exposure may override gain)
+
+- class: "WebCameraDevice"
+  device_class_id: 2                   # camera_1 = inhand_left (openMV, hub port 10)
+  state_feedback:
+    fps: 30.0
+    buffer_size: 100
+    hardware_latency_ms: 30.0
+    format:
+      shape: [360, 640, 3]
+      dtype: "uint8"
+      type: rgb
+  capture_id: ${camera.left_capture_id}
+  backend: 200
+  fourcc: "MJPG"
+  open_retries: 5
+  open_retry_delay_s: 1.5
+  open_delay_s: 2.0
+  warmup_frames: 20
+  post_open_settle_s: 0.3
+  auto_exposure: 3         # 3 = auto exposure; use 1 + exposure for a fixed value
+  auto_wb: 1               # 1 = auto white balance on
+  brightness: 80           # 0..255
+  contrast: 35             # 0..255
+  saturation: 110          # 0..127
+  hue: 0                   # -18000..18000
+  backlight: 1             # 0..1 toggle
+  gain: 102                # 0..767 (auto_exposure may override gain)
+
+- class: "WebCameraDevice"
+  device_class_id: 3                   # camera_2 = head (4K U3, hub port 6.1)
+  state_feedback:
+    fps: 30.0
+    buffer_size: 200
+    hardware_latency_ms: 0.0
+    format:
+      shape: [480, 640, 3]      # 3:4 capture (h<w); saved as-is, no crop/pad
+      dtype: "uint8"
+      type: rgb
+  capture_id: ${camera.head_capture_id}
+  backend: 200                   # cv2.CAP_V4L2 (Linux); 700=CAP_DSHOW is Windows-only
+  fourcc: "MJPG"
+  open_retries: 5
+  open_retry_delay_s: 1.5
+  open_delay_s: 4.0
+  warmup_frames: 20
+  post_open_settle_s: 0.3
+  auto_exposure: 3
+  auto_wb: 1
+  exposure:
+  gain: 102
+  wb_temperature:
+  backlight: 40
+  brightness: 155
+  contrast: 65
+  saturation: 105
+  hue: 0
+  gamma: 53
+  sharpness: 128
+
+  # ---- dual Flexiv arms + LKTech grippers (identical to teleop config) ----
+- class: "RizonRobotLKForceGated"
+  device_class_id: 4
+  robot_sn:
+  - "${oc.env:R1_LEFT_ROBOT_SN,Rizon4-063087}"
+  - "${oc.env:R1_RIGHT_ROBOT_SN,Rizon4R-062071}"
+  state_feedback:
+    fps: 120.0
+    buffer_size: 1000
+    hardware_latency_ms: 10.0
+    format:
+      shape: [88]
+      dtype: "float64"
+        # Base: left/right q, dq, measured TCP pose (WXYZ), gripper width.
+        # Tail: measured gripper width/motor angle per arm; commanded TCP
+        # pose/wrench per arm; measured TCP twist per arm; commanded grippers.
+      type: [j1-7, dq1-7, xyz, qwqxqyqz, gripper, j1-7, dq1-7, xyz, qwqxqyqz, gripper, gripper, motor_angle, gripper,
+          motor_angle, xyz, qwqxqyqz, wrench, xyz, qwqxqyqz, wrench, twist, twist, gripper, gripper]
+  control:
+    type: eef_abs    # joints | eef_abs | eef_rel
+    source_selection:
+      mode: single_source
+      source:
+        device: Quest3VuerTeleoperator
+        device_class_id: 5
+        port: state
+    execution:
+      mode: synchronous    # synchronous | legacy_async
+      fps: 100.0
+    buffer_size: 100
+    format:
+      shape: [16]
+      dtype: "float64"
+        # Per arm: absolute TCP xyz, quaternion (XYZW), then gripper command.
+      type: [xyz, qxqyqzqw, gripper, xyz, qxqyqzqw, gripper]
+    cartesian_impedance:
+      translation_n_m: [10000.0, 10000.0, 10000.0]
+      rotation_nm_rad: [1500.0, 1500.0, 1500.0]
+  motion_limits:
+    velocity:
+      joints_rad_s:
+        left: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+        right: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+      tcp_linear_m_s: 1.0
+      tcp_angular_rad_s: 2.0
+    acceleration:
+      joints_rad_s2:
+        left: [2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0]
+        right: [2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0]
+      tcp_linear_m_s2: 2.0
+      tcp_angular_rad_s2: 5.0
+      # null disables the limit; otherwise [Fx, Fy, Fz, Mx, My, Mz] in N / N*m.
+    max_tcp_contact_wrench:
+  gripper:
+    backend: "lktech"
+    name: "lktech_dual"
+      # by-path: CH340 adapters share VID/SN, so key off the physical USB socket.
+    port:
+    - "${oc.env:R1_LEFT_GRIPPER_PORT,/dev/serial/by-path/pci-0000:80:14.0-usb-0:9.4:1.0-port0}"
+    - "${oc.env:R1_RIGHT_GRIPPER_PORT,/dev/serial/by-path/pci-0000:80:14.0-usb-0:9.1:1.0-port0}"
+    motor_id: [1, 1]
+      # Record/state in physical width (meters) so cmd and state share units.
+    value_mode: "width_m"
+      # Quest commands are a normalized opening ratio even though feedback is meters.
+    command_value_mode: "normalized"
+    arm_length_m: 0.06543          # isosceles leg length L (m)
+    apex_angle_max_deg: 90.0       # max JAW open apex angle (deg); hard travel limit
+    gear_ratio: 10.0               # motor deg per jaw deg (jaw:motor = 1:10); maps
+                                   # the jaw apex limit to motor travel for clipping
+    min_vel: 0.0
+      # SAFETY: 1.0 (~1 s stroke). Higher values slam the gripper into the
+      # mechanical stop and can break the gears (esp. during calibration).
+    max_vel: 1.0
+      # Leave encoder calib NULL so the SDK uses fast multi_turn_angle mode;
+      # setting them forces a slow encoder crawl (~5 s/stroke).
+    min_encoder:
+    max_encoder:
+    calibration_directory: "~/.cache/teleop_lktech_calib"
+    auto_calibrate: true
+      # SAFETY: gentle contact thresholds so a limit is detected with little torque
+      # (SDK defaults -90/+160 ramp hard into the stop and can break the gears).
+    min_torque_iq: -40
+    max_torque_iq: 190
+    wait_timeout: 5.0
+    tool_name: ""
+  gripper_iq_force_limit: [90.0, 90.0]
+    # When iq exceeds the cap, ease the gripper OPEN by this step (meters, width_m
+    # mode) each control cycle instead of just holding, so the clamp force is
+    # actively regulated back toward the threshold. <= 0 keeps the legacy hold.
+  gripper_force_backoff: [0.001, 0.001]
+    # Latch + hysteresis: once force-limited, the grip holds an open "floor" and
+    # won't re-close until the operator opens past floor + this margin (meters).
+    # Larger = stickier latch / less chatter; smaller = easier to re-grip.
+  gripper_force_release: [0.005, 0.005]
+  gripper_force_print_period: 1.0
+  signal_files: ${runtime.signal_files}
+  home:
+    preset_index: ${robot.home}
+    presets:
+        # Both arms drive to [80, 65, 20, 75, 45, 40, 10] deg on home/startup.
+        # Values below are RADIANS (Flexiv RDK joint targets are radians).
+    - name: "rizon_dual_home_deg"
+      description: "Both arms -> [80,65,20,75,45,40,10] deg"
+      joints_left: [1.396263, 1.134464, 0.349066, 1.308997, 0.785398, 0.698132, 0.174533]
+      joints_right: [1.396263, 1.134464, 0.349066, 1.308997, 0.785398, 0.698132, 0.174533]
+
+  # ---- Quest3 teleoperator (drives the robots; operator still teleoperates) ----
+- class: "Quest3VuerTeleoperator"
+  device_class_id: 5
+  state_feedback:
+    fps: 50.0
+    buffer_size: 100
+    hardware_latency_ms: 5.0
+    format:
+      shape: [16]
+      dtype: "float64"
+        # Left/right absolute TCP pose (XYZW) followed by each gripper command.
+      type: [xyz, qxqyqzqw, gripper, xyz, qxqyqzqw, gripper]
+  robot_device_name: "RizonRobotLKForceGated"
+  robot_device_class_id: 4
+  host: "0.0.0.0"
+  port: 8012
+    # FPV WebRTC source for the Quest browser.
+  webrtc_server_host: "${oc.env:R1_WEBRTC_BIND_HOST,0.0.0.0}"
+  webrtc_server_port: ${oc.env:R1_WEBRTC_PORT,8080}
+  webrtc_src: "https://${oc.env:R1_HOST_IP,10.128.0.194}:${oc.env:R1_WEBRTC_PORT,8080}/offer"
+    # WebRTC backend: "aiortc" (pure-Python, GIL-bound send loop) or "gstreamer"
+    # (webrtcbin -- native multi-threaded encode/packetize/SRTP/send, no GIL
+    # bottleneck). VP8 either way, so the Quest/Vuer client is unchanged.
+    # Requires (Ubuntu): gstreamer1.0-plugins-bad gstreamer1.0-nice
+    # gir1.2-gst-plugins-bad-1.0 python3-gi — see docs_r1/SOP_R1数据收集与回放.md §0.4
+  webrtc_backend: "aiortc"
+  cert_file: "certs/cert.pem"
+  key_file: "certs/key.pem"
+  xr_frame_rate: 120
+  world_locked: true
+  video_height: 2.5
+  video_y: -0.65
+  video_z: -2.5
+  skip_patch: false
+  allow_cache: false
+    # ~1 Hz controller-channel diagnostics (HAND_MOVE rate / visibility). Set to
+    # true to troubleshoot Quest connectivity; off by default to avoid log spam.
+  diag: false
+    # Relative to the repo root (device_starter is always launched from there);
+    # resolved via Path(...).resolve(), so this stays host-independent.
+  vuer_viewer_path: third_party/quest_vuer
+  flexiv_orientation_mode: "relative"
+  flexiv_pos_scale: 1.0
+  flexiv_max_step_m: 0.005
+  flexiv_max_step_rad: 0.05
+  flexiv_workspace_radius: 0.30
+  deadman: true
+  enable_left: true
+  enable_right: true
+  gripper_open_value: 1.0
+    # RIGHT-B = one-shot return-to-home (shared signal-file pattern with the robot).
+  home_command_pattern: ${runtime.signal_files.robot_home_command_pattern}
+
+  # ---- YAM head arm ----
+- class: "YamHeadRobot"
+  device_class_id: 6
+  state_feedback:
+    fps: 60.0
+    buffer_size: 100
+    hardware_latency_ms: 5.0
+    format:
+      shape: [20]
+      dtype: "float64"
+        # Six joints, commanded TCP pose, then measured TCP pose; quaternions XYZW.
+      type: [j1-6, xyz, qxqyqzqw, xyz, qxqyqzqw]
+  teleop_device_name: "Quest3VuerTeleoperator"
+  teleop_device_class_id: 5
+  yam_channel: "can0"
+  yam_arm: "yam"
+  yam_gripper: "no_gripper"
+  yam_sim: false
+  yam_ee_site: "grasp_site"
+  yam_initial_q: "0,2,0.73,0.82,0,0.02"
+  ramp_duration_s: 5
+  home_to_zero_on_exit: true
+  yam_orientation_mode: "relative"
+  yam_pos_scale: 1.0
+  yam_workspace_radius: 0.35
+  yam_max_step: 0.03
+  yam_ik_max_iters: 30
+  yam_ik_soft_pos_tol: 0.02
+  yam_ik_soft_ori_tol: 0.10
+  yam_head_filter_tau: 0.06
+    # Fix mirrored head ROLL (yaw/pitch already correct). If roll is still wrong
+    # after enabling, try yam_head_fwd_axis 0/1/2; set false to disable.
+  yam_flip_head_roll: true
+  yam_head_fwd_axis: 2
+  use_publisher: true
+  yam_publisher_hz: 143.0
+  yam_publisher_vmax:
+  yam_publisher_amax: 50.0
+    # RIGHT-B go-home: slews back to yam_initial_q and drops to WAIT.
+  home_command_pattern: ${runtime.signal_files.robot_home_command_pattern}

@@ -1,0 +1,131 @@
+# X1 (TJ / nmxrdk) Quest3 VR dual-arm teleop + data-collection device list.
+#
+# Pairs X1VuerTeleoperator (VR capture + coordinate mapping -> 18D eef_abs SHM)
+# with X1Robot (reads that SHM, drives arms via nmxrdk move_line + grippers +
+# head), plus TjCameraDevice instances that publish frames into per-device SHM
+# so the device_manager can aggregate them for the NEDF3 data saver.
+#
+# Camera device_class_id -> role mapping (mirrors R1's camera_0/1/2):
+#   TjCameraDevice_0 = right wrist (inhand_right)   [not installed yet -> black frames]
+#   TjCameraDevice_1 = left  wrist (inhand_left)    [not installed yet -> black frames]
+#   TjCameraDevice_2 = head        (ego)            [real: nmxrdk CAMID_0]
+#
+# The FPV WebRTC server reads the HEAD frame from SHM instead of grabbing the
+# camera itself (single grabber per camera):
+#   python incubator/teleoperation/x1/tj_camera_webrtc.py --https \
+#       --shm-name TjCameraDevice_2_data
+#
+# Launch (once hydra is installed in the env):
+#   python device_starter.py --config-name quest3_collect_x1
+
+devices:
+  # ---- X1 dual-arm + head robot (nmxrdk) ----
+  - class: "X1Robot"
+    device_class_id: 0
+    robot_id: "1e783be2dd870ef5"
+    state_feedback:
+      fps: 60.0
+      buffer_size: 1000
+      hardware_latency_ms: 0.0
+      format:
+        shape: [30]
+        dtype: "float64"
+        # Left q/TCP, right q/TCP, then head pitch/yaw. TCP quaternion is WXYZ.
+        type: [j1-7, xyz, qwqxqyqz, j1-7, xyz, qwqxqyqz, j1-2]
+    control:
+      type: eef_abs    # joints | eef_abs | eef_rel
+      source_selection:
+        mode: single_source
+        source:
+          device: X1VuerTeleoperator
+          device_class_id: 1
+          port: state
+      execution:
+        mode: synchronous
+        fps: 15.0    # nmxrdk move_line dispatch rate; higher rates cause twitching.
+      buffer_size: 100
+      format:
+        shape: [18]
+        dtype: "float64"
+        # Left/right TCP pose (XYZW) + gripper, then head pitch/yaw targets.
+        type: [xyz, qxqyqzqw, gripper, xyz, qxqyqzqw, gripper, j1-2]
+    motion_limits:
+      velocity:
+        tcp_linear_m_s: 0.3
+    home_on_start: true
+
+  # ---- Quest3 Vuer VR teleoperator (control output only) ----
+  - class: "X1VuerTeleoperator"
+    device_class_id: 1
+    state_feedback:
+      fps: 50.0
+      buffer_size: 100
+      hardware_latency_ms: 0.0
+      format:
+        shape: [18]
+        dtype: "float64"
+        # Left/right TCP pose (XYZW) + gripper, then head pitch/yaw targets.
+        type: [xyz, qxqyqzqw, gripper, xyz, qxqyqzqw, gripper, j1-2]
+    robot_device_name: "X1Robot"
+    robot_device_class_id: 0
+    arm_side: "both"              # left / right / both
+    port: 8012
+    https: true                   # provide workstation-local certs under incubator/teleoperation/x1/certs
+    cert_file: "incubator/teleoperation/x1/certs/cert.pem"
+    key_file: "incubator/teleoperation/x1/certs/key.pem"
+    webrtc_src: ""                # e.g. "https://<host>:8080/offer" from tj_camera_webrtc.py
+    orientation_mode: "relative"
+    lock_orientation: false
+    fixed_frame: false
+    no_deadman: false
+    pos_scale: 1.0
+    smooth: 0.4
+    max_step_rad: 0.05
+    workspace_radius: 0.25
+    enable_head: true
+    # Episode recording trigger: a VR controller button toggles start/end and
+    # writes the signal files the data saver waits on.
+    enable_episode_trigger: true
+    episode_signal_pattern: "/tmp/superinference_episode_{signal}"
+
+  # ---- Cameras (nmxrdk) -> per-device SHM for data collection ----
+  # Right wrist (not installed yet -> publishes black frames + warning).
+  - class: "TjCameraDevice"
+    device_class_id: 2
+    state_feedback:
+      fps: 30.0
+      buffer_size: 100
+      hardware_latency_ms: 0.0
+      format:
+        shape: [480, 640, 3]
+        dtype: "uint8"
+        type: rgb
+    robot_id: "1e783be2dd870ef5"
+    cam_id: "CAMID_1"
+    role: "inhand_right"
+  - class: "TjCameraDevice"
+    device_class_id: 3
+    state_feedback:
+      fps: 30.0
+      buffer_size: 100
+      hardware_latency_ms: 0.0
+      format:
+        shape: [480, 640, 3]
+        dtype: "uint8"
+        type: rgb
+    robot_id: "1e783be2dd870ef5"
+    cam_id: "CAMID_2"
+    role: "inhand_left"
+  - class: "TjCameraDevice"
+    device_class_id: 4
+    state_feedback:
+      fps: 30.0
+      buffer_size: 100
+      hardware_latency_ms: 0.0
+      format:
+        shape: [480, 640, 3]
+        dtype: "uint8"
+        type: rgb
+    robot_id: "1e783be2dd870ef5"
+    cam_id: "CAMID_0"
+    role: "head"

@@ -1,0 +1,32 @@
+defaults:
+  - devices: quest3_teleop
+  - device_manager: base
+  - action_executor: default
+  - consumer: default
+  - runtime: default
+  - _self_
+
+device_manager:
+  device_manager:
+    params:
+      buffer_size: 100
+
+# Camera configuration - modify these to change camera IDs
+camera:
+  left_capture_id: 1
+  right_capture_id: 0
+
+# Robot configuration
+robot:
+  home: 0  # Home preset index (0-5)
+
+global_settings:
+  log_level: INFO
+  restart_on_failure: true
+  max_restart_attempts: 3
+  restart_delay: 2.0
+
+hydra:
+  run:
+    dir: .
+  output_subdir: null

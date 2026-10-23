@@ -1,0 +1,30 @@
+defaults:
+  - devices: i2rt_d405_yam_collection
+  - device_manager: base
+  - action_executor: default
+  - consumer: default
+  - runtime: default
+  - _self_
+
+camera:
+  left_id: 0
+  left_serial: ${oc.env:SI_I2RT_LEFT_RS_SERIAL}
+  right_id: 2
+  right_serial: ${oc.env:SI_I2RT_RIGHT_RS_SERIAL}
+  head_id: 4
+  head_enabled: ${oc.env:SI_I2RT_HEAD_CAMERA_ENABLED,true}
+  head_serial: ${oc.env:SI_I2RT_HEAD_RS_SERIAL,''}
+
+runtime:
+  enable_device_manager: false
+
+global_settings:
+  log_level: INFO
+  restart_on_failure: false
+  max_restart_attempts: 3
+  restart_delay: 2.0
+
+hydra:
+  run:
+    dir: .
+  output_subdir: null

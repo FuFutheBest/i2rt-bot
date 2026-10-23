@@ -1,0 +1,32 @@
+# Dependencies for hardware-facing adapters and latency probes.
+-r requirements.txt
+
+# Cameras and camera evaluation
+opencv-python
+pyrealsense2
+record3d
+flask
+fastapi
+uvicorn
+
+# Vive/OpenXR tracking
+pyopenxr==1.1.5101
+
+# Serial devices, encoders, and manual hardware probes
+pyserial
+keyboard
+pynput
+pandas
+matplotlib
+transforms3d
+ruamel.yaml
+
+# Optional simulation and kinematics helpers available from PyPI
+pybullet
+mujoco
+mink
+qpsolvers
+
+# Vendor-only SDKs are deliberately excluded: Flexiv RDK/pybind, Hik MVS,
+# Record3D native support, NEDF APIs, and ROS packages must be installed for
+# the selected workstation and config.

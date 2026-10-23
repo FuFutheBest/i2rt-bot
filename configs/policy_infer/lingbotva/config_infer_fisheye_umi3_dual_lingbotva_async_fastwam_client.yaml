@@ -1,0 +1,146 @@
+# @package _global_
+
+defaults:
+  - /devices/infer@devices: rizon_dual_eef_abs_fisheye_webcam
+  - /device_manager: sync
+  - /action_executor: base_auto_drop
+  - /yam_head_tracking: planned_robot_center_scaled_motion
+  - /consumer: default
+  - /runtime: default
+  - _self_
+
+device_manager:
+  device_manager:
+    master_device_class_id: 2
+    params:
+      buffer_size: 500
+
+shared:
+  summary_shm_name: device_summary_data
+
+camera:
+  left_capture_id: 1
+  right_capture_id: 0
+
+global_settings:
+  log_level: INFO
+  restart_on_failure: true
+  max_restart_attempts: 3
+  restart_delay: 2.0
+
+hydra:
+  run:
+    dir: .
+  output_subdir: null
+
+summary_shm: device_summary_data
+
+action_executor:
+  action_executor:
+    chunk_manager:
+      type: auto_manager_v2
+      search_tolerance: 4
+      pos_weight: 0.4
+      rot_weight: 0.1
+      ee_weight: 0.01
+      discount_factor: 0.98
+      direction_consistency_range: 4
+
+policy:
+  class: LingBotVAPolicy
+  params:
+    host: 127.0.0.1
+    port: 18080
+    device: "cuda"
+    camera_devices: # mapping from camera_devices to model_camera_keys
+      - "WebCameraDevice_0"
+      - "WebCameraDevice_1"
+    model_camera_keys:
+      - observation.images.wrist_image_1
+      - observation.images.wrist_image_2
+    robot_device: RizonRobot_2
+
+    # Remote/local inference settings.
+    # Compress camera frames before sending them to the remote LingBot-VA server.
+    # Use "raw" to send uint8 arrays directly for local inference.
+    remote_image_encoding: jpeg
+    remote_image_jpeg_quality: 100
+
+    param_dtype: bf16
+    attn_mode: flashattn
+    enable_offload: false
+    offload_vae: false
+    offload_text_encoder: true
+    stateless_reset_each_predict: false
+    block: false
+
+    # History KV-cache anchoring: wait until the arm physically reaches the last action
+    # pose of the chunk, then sample images + robot poses backward from that moment.
+    history_anchor_mode: now            # "arrival" | "now" (legacy forward-from-predict)
+    async_base_timestamp: true          # use inference_start_ns as history base_timestamp_ns
+    history_now_base_offset_ns: 100000000
+    history_now_last_keyframe_offset_ns: 500000000
+    history_arrival_pos_tolerance_m: 0.01   # position tolerance (meters) for arrival
+    history_arrival_rot_tolerance_rad: 0.2  # orientation tolerance (radians) for arrival
+    history_arrival_timeout_s: 1.0          # give up waiting and anchor at "now" after this
+    history_state_from_robot_pose: true     # build compute_kv_cache state from actual poses
+    history_manual_selection:
+      enabled: false
+      window_ms: 600.0
+      max_candidates_per_step: 15
+      timeout_s: 0.0
+      auto_open_browser: true
+      port: 0
+      save_dir: /tmp/superinference_manual_history_picker
+
+    gripper_max_width: 0.11
+    normalize_gripper_width: false
+
+    # crop 360x640 -> 360x270, then resize to hxw=320x240
+    reshape_mode: crop_resize
+    center_crop_before_resize: false
+    crop_before_resize:
+      - 185
+      - 185
+      - 0
+      - 0
+    crop_resize_size:
+      - 320
+      - 240
+    pad_after_resize: null
+
+    frame_chunk_size: 4 # 2
+    # attn_window: 30
+    attn_window: 4
+    guidance_scale: 5.0
+    action_guidance_scale: 1.0
+    num_inference_steps: 0 # 25
+    action_num_inference_steps: 10 # 50
+
+    save_root: /home/noematrix/SuperInference.lingbotva/logs/runs
+    save_predicted_video_latents: false
+    save_history_cache_latents: false
+    decoded_latent_save_dir: /home/noematrix/SuperInference.lingbotva/logs/decoded_lingbot_latents
+
+  fps: 100
+  control_fps: 30.0 # 30.0
+  chunk_length: 48 # 24
+
+  obs:
+    devices:
+      - "WebCameraDevice_0"
+      - "WebCameraDevice_1"
+      - RizonRobot_2
+
+  controls:
+    - endpoint:
+        device: RizonRobot
+        device_class_id: 2
+        port: command
+      shape:
+        - 16
+      dtype: float64
+
+  history_video:
+    enabled: false
+    save_dir: /home/noematrix/SuperInference.lingbotva/logs/history_keyframes

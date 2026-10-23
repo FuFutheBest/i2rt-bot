@@ -1,0 +1,7 @@
+# Best-effort install profile for all pip-installable project dependencies.
+# This still excludes CUDA-specific PyTorch wheels and vendor SDKs that require
+# manual installation.
+-r requirements-dev.txt
+-r requirements-scripts.txt
+-r requirements-hardware.txt
+-r requirements-policy.txt

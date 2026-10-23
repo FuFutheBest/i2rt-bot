@@ -1,0 +1,10 @@
+# Dedicated RoboTwin simulation environment. Keep this separate from model
+# environments whose Torch/CUDA or dependency pins differ from upstream RoboTwin.
+-r requirements.txt
+-r ../third_party/RoboTwin/scripts/requirements.txt
+
+# sapien==3.0.0b1 imports pkg_resources, which setuptools removed in v82.
+setuptools<82
+
+# RoboTwin pins numpy==1.26.4. rerun-sdk 0.23+ requires NumPy 2.x.
+rerun-sdk==0.22.1

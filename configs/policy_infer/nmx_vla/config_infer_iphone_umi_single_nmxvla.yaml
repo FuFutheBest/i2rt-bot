@@ -1,0 +1,83 @@
+# @package _global_
+
+defaults:
+  - /devices/infer@devices: rizon_single_eef_abs_iphone_umi
+  - /device_manager: sync
+  - /action_executor: base
+  - /consumer: default
+  - /runtime: default
+  - _self_
+
+camera:
+  left_capture_id: 0
+
+device_manager:
+  device_manager:
+    master_device_class_id: 1
+    params:
+      buffer_size: 100000
+
+shared:
+  summary_shm_name: device_summary_data
+
+global_settings:
+  log_level: INFO
+  restart_on_failure: true
+  max_restart_attempts: 3
+  restart_delay: 2.0
+
+hydra:
+  run:
+    dir: .
+  output_subdir: null
+
+summary_shm: device_summary_data
+
+policy:
+  class: NMXVLAPolicy
+  params:
+    # Supports:
+    # 1) /path/to/run_dir
+    # 2) /path/to/run_dir/checkpoints
+    # 3) /path/to/steps_xxx_pytorch_model.pt
+    # ckpt_path: "/home/noematrix/ckpt/qwenpi_stack_bowl_finetune_h24x2_b64_i240k"
+    ckpt_path: "/home/noematrix/ckpt/qwenpi_stack_bowl_stage2_rpy_normed_h16x3_b32x4_i240k_multinode"
+    task: "叠碗"
+    device: "cuda"
+
+    obs_horizon: 1
+    downsample: 1
+    obs_time_interval: 0.04
+    camera_devices:
+      - "IPhoneCameraDevice_0"
+    robot_device: "RizonRobot_1"
+    include_state: true
+    # unnormalize_method: "quan"
+    unnormalize_method:
+      - "quan"
+      - "quan"
+      - "quan"
+      - "quan"
+      - "quan"
+      - "quan"
+      - "quan"
+      - "minmax"
+    # rot_type: "wxyz"
+    rot_type: "XYZ"
+
+  fps: 0.5
+  control_fps: 10.0
+  chunk_length: 48
+
+  obs:
+    devices:
+      - "IPhoneCameraDevice_0"
+      - "RizonRobot_1"
+
+  controls:
+    - endpoint:
+        device: RizonRobot
+        device_class_id: 1
+        port: command
+      shape: [8]
+      dtype: "float64"

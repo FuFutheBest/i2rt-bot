@@ -1,0 +1,636 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Timestamp Event Visualizer</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f7f9;
+      --panel: #ffffff;
+      --text: #18202a;
+      --muted: #657080;
+      --border: #d7dce3;
+      --action: #0f766e;
+      --chunk: #2563eb;
+      --history-image: #b45309;
+      --history-pose: #7c3aed;
+      --miss: #b91c1c;
+      --grid: #e8ebf0;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 16px 20px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 20px;
+      line-height: 1.2;
+      letter-spacing: 0;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 16px;
+      padding: 16px;
+    }
+
+    aside,
+    section {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    aside {
+      padding: 14px;
+      height: calc(100vh - 89px);
+      overflow: auto;
+    }
+
+    section {
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .stack {
+      display: grid;
+      gap: 12px;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 650;
+      text-transform: uppercase;
+    }
+
+    input,
+    select,
+    button {
+      width: 100%;
+      min-height: 36px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--text);
+      font: inherit;
+      font-size: 14px;
+    }
+
+    input,
+    select {
+      padding: 6px 8px;
+    }
+
+    button {
+      cursor: pointer;
+      font-weight: 650;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .stat {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      min-width: 0;
+    }
+
+    .stat strong {
+      display: block;
+      font-size: 19px;
+      line-height: 1.2;
+    }
+
+    .stat span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .legend {
+      display: grid;
+      gap: 7px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .legend-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      flex: 0 0 auto;
+    }
+
+    .chart-wrap {
+      padding: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 430px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .table-wrap {
+      max-height: calc(100vh - 570px);
+      min-height: 220px;
+      overflow: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th,
+    td {
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--grid);
+      text-align: left;
+      vertical-align: top;
+      white-space: nowrap;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      background: #fafbfc;
+      z-index: 1;
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 22px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .empty {
+      padding: 40px 18px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .hint {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    @media (max-width: 900px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+
+      aside {
+        height: auto;
+      }
+
+      .table-wrap {
+        max-height: 420px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Timestamp Event Visualizer</h1>
+    <div id="fileSummary" class="hint">Load JSONL files from logs/timestamp_events.</div>
+  </header>
+  <main>
+    <aside class="stack">
+      <label>
+        Event JSONL files
+        <input id="fileInput" type="file" accept=".jsonl,.log,.txt,application/json" multiple>
+      </label>
+      <label>
+        Event type
+        <select id="eventFilter">
+          <option value="">All events</option>
+        </select>
+      </label>
+      <label>
+        Device
+        <select id="deviceFilter">
+          <option value="">All devices</option>
+        </select>
+      </label>
+      <label>
+        Source
+        <select id="sourceFilter">
+          <option value="">All sources</option>
+        </select>
+      </label>
+      <button id="resetZoom" type="button">Reset zoom</button>
+      <div class="stats">
+        <div class="stat"><strong id="countStat">0</strong><span>Events</span></div>
+        <div class="stat"><strong id="spanStat">0 ms</strong><span>Visible span</span></div>
+        <div class="stat"><strong id="dispatchStat">0</strong><span>Actions</span></div>
+        <div class="stat"><strong id="missStat">0</strong><span>Misses</span></div>
+      </div>
+      <div class="legend">
+        <div class="legend-row"><span class="dot" style="background: var(--action)"></span> action_dispatched</div>
+        <div class="legend-row"><span class="dot" style="background: var(--chunk)"></span> action_chunk_written</div>
+        <div class="legend-row"><span class="dot" style="background: var(--history-image)"></span> history_image_read</div>
+        <div class="legend-row"><span class="dot" style="background: var(--history-pose)"></span> history_pose_read</div>
+        <div class="legend-row"><span class="dot" style="background: var(--miss)"></span> history_keyframe_missed</div>
+      </div>
+      <p class="hint">Drag on the chart to zoom. The table follows the current filters and zoom window.</p>
+    </aside>
+    <section>
+      <div class="chart-wrap">
+        <canvas id="chart" width="1400" height="520"></canvas>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Type</th>
+              <th>Source</th>
+              <th>Device</th>
+              <th>Target</th>
+              <th>Matched</th>
+              <th>Diff</th>
+              <th>Step</th>
+              <th>Extra</th>
+            </tr>
+          </thead>
+          <tbody id="eventRows">
+            <tr><td class="empty" colspan="9">No data loaded.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const fileInput = document.getElementById("fileInput");
+    const fileSummary = document.getElementById("fileSummary");
+    const eventFilter = document.getElementById("eventFilter");
+    const deviceFilter = document.getElementById("deviceFilter");
+    const sourceFilter = document.getElementById("sourceFilter");
+    const resetZoom = document.getElementById("resetZoom");
+    const rows = document.getElementById("eventRows");
+    const canvas = document.getElementById("chart");
+    const ctx = canvas.getContext("2d");
+
+    const countStat = document.getElementById("countStat");
+    const spanStat = document.getElementById("spanStat");
+    const dispatchStat = document.getElementById("dispatchStat");
+    const missStat = document.getElementById("missStat");
+
+    let events = [];
+    let zoom = null;
+    let dragStartX = null;
+
+    const colors = {
+      action_dispatched: "#0f766e",
+      action_chunk_written: "#2563eb",
+      history_keyframe_read: "#b45309",
+      history_keyframe_missed: "#b91c1c",
+      history_image_read: "#b45309",
+      history_image_missed: "#b91c1c",
+      history_pose_read: "#7c3aed",
+      history_pose_missed: "#b91c1c",
+      logger_started: "#64748b",
+    };
+
+    function eventNs(event) {
+      if (event.history_timeline_timestamp_ns) {
+        return Number(event.history_timeline_timestamp_ns);
+      }
+      if (event.event_type === "history_image_read") {
+        return Number(event.history_image_timestamp_ns || event.matched_frame_timestamp_ns || event.target_timestamp_ns || event.event_ns || 0);
+      }
+      if (event.event_type === "history_pose_read") {
+        return Number(event.history_pose_timestamp_ns || event.matched_frame_timestamp_ns || event.target_timestamp_ns || event.event_ns || 0);
+      }
+      if (event.event_type === "history_keyframe_read") {
+        return Number(event.matched_frame_timestamp_ns || event.target_timestamp_ns || event.event_ns || 0);
+      }
+      if (
+        event.event_type === "history_keyframe_missed" ||
+        event.event_type === "history_image_missed" ||
+        event.event_type === "history_pose_missed"
+      ) {
+        return Number(event.target_timestamp_ns || event.event_ns || 0);
+      }
+      return Number(event.event_ns || event.policy_write_timestamp_ns || event.action_timestamp_ns || 0);
+    }
+
+    function formatNs(ns) {
+      if (!Number.isFinite(ns) || ns <= 0) return "";
+      const date = new Date(ns / 1e6);
+      const ms = String(date.getMilliseconds()).padStart(3, "0");
+      return `${date.toLocaleTimeString()}.${ms}`;
+    }
+
+    function formatDuration(ns) {
+      if (!Number.isFinite(ns)) return "";
+      const abs = Math.abs(ns);
+      if (abs >= 1e9) return `${(ns / 1e9).toFixed(3)} s`;
+      if (abs >= 1e6) return `${(ns / 1e6).toFixed(2)} ms`;
+      if (abs >= 1e3) return `${(ns / 1e3).toFixed(1)} us`;
+      return `${ns.toFixed(0)} ns`;
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
+    }
+
+    function colorFor(type) {
+      return colors[type] || "#475569";
+    }
+
+    function eventDevice(event) {
+      return event.device_name || (Array.isArray(event.device_names) ? event.device_names.join(",") : "");
+    }
+
+    function uniqueSorted(values) {
+      return Array.from(new Set(values.filter(Boolean))).sort((a, b) => String(a).localeCompare(String(b)));
+    }
+
+    function rebuildFilters() {
+      const selected = {
+        event: eventFilter.value,
+        device: deviceFilter.value,
+        source: sourceFilter.value,
+      };
+      fillSelect(eventFilter, uniqueSorted(events.map(e => e.event_type)), "All events");
+      fillSelect(deviceFilter, uniqueSorted(events.map(eventDevice)), "All devices");
+      fillSelect(sourceFilter, uniqueSorted(events.map(e => e.source)), "All sources");
+      eventFilter.value = selected.event;
+      deviceFilter.value = selected.device;
+      sourceFilter.value = selected.source;
+    }
+
+    function fillSelect(select, values, placeholder) {
+      select.innerHTML = `<option value="">${placeholder}</option>` + values
+        .map(value => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`)
+        .join("");
+    }
+
+    function getFilteredEvents(ignoreZoom = false) {
+      const type = eventFilter.value;
+      const device = deviceFilter.value;
+      const source = sourceFilter.value;
+      return events.filter(event => {
+        const ns = eventNs(event);
+        if (type && event.event_type !== type) return false;
+        if (device && eventDevice(event) !== device) return false;
+        if (source && event.source !== source) return false;
+        if (!ignoreZoom && zoom && (ns < zoom[0] || ns > zoom[1])) return false;
+        return true;
+      });
+    }
+
+    function currentDomain(sourceEvents) {
+      const values = sourceEvents.map(eventNs).filter(Number.isFinite);
+      if (values.length === 0) return [0, 1];
+      let min = Math.min(...values);
+      let max = Math.max(...values);
+      if (zoom) return zoom;
+      if (min === max) {
+        min -= 1e9;
+        max += 1e9;
+      }
+      return [min, max];
+    }
+
+    function rowFor(event) {
+      const diff = event.timestamp_diff_ns ?? (
+        event.matched_frame_timestamp_ns && event.target_timestamp_ns
+          ? Number(event.matched_frame_timestamp_ns) - Number(event.target_timestamp_ns)
+          : null
+      );
+      const extra = [];
+      if (event.write_index !== undefined) extra.push(`write=${event.write_index}`);
+      if (event.chunk_shape) extra.push(`shape=${event.chunk_shape.join("x")}`);
+      if (event.frame_index !== undefined) extra.push(`idx=${event.frame_index}`);
+      if (event.history_kind) extra.push(event.history_kind);
+      if (event.tolerance_ms !== undefined) extra.push(`tol=${event.tolerance_ms}ms`);
+      return `
+        <tr>
+          <td>${escapeHtml(formatNs(eventNs(event)))}</td>
+          <td><span class="pill" style="background:${colorFor(event.event_type)}">${escapeHtml(event.event_type)}</span></td>
+          <td>${escapeHtml(event.source)}</td>
+          <td>${escapeHtml(eventDevice(event))}</td>
+          <td>${escapeHtml(formatNs(Number(event.target_timestamp_ns)))}</td>
+          <td>${escapeHtml(formatNs(Number(event.matched_frame_timestamp_ns || event.action_timestamp_ns || event.policy_write_timestamp_ns)))}</td>
+          <td>${escapeHtml(diff == null ? "" : formatDuration(Number(diff)))}</td>
+          <td>${escapeHtml(event.step ?? "")}</td>
+          <td>${escapeHtml(extra.join(" | "))}</td>
+        </tr>`;
+    }
+
+    function renderTable(visible) {
+      if (visible.length === 0) {
+        rows.innerHTML = `<tr><td class="empty" colspan="9">No events match the current filters.</td></tr>`;
+        return;
+      }
+      rows.innerHTML = visible
+        .slice()
+        .sort((a, b) => eventNs(a) - eventNs(b))
+        .map(rowFor)
+        .join("");
+    }
+
+    function renderStats(visible, domain) {
+      countStat.textContent = String(visible.length);
+      spanStat.textContent = formatDuration(domain[1] - domain[0]);
+      dispatchStat.textContent = String(visible.filter(e => e.event_type === "action_dispatched").length);
+      missStat.textContent = String(visible.filter(e =>
+        e.event_type === "history_keyframe_missed" ||
+        e.event_type === "history_image_missed" ||
+        e.event_type === "history_pose_missed"
+      ).length);
+    }
+
+    function renderChart() {
+      const base = getFilteredEvents(true);
+      const visible = getFilteredEvents(false);
+      const domain = currentDomain(base);
+      const width = canvas.width;
+      const height = canvas.height;
+      const pad = { left: 70, right: 28, top: 28, bottom: 48 };
+      const plotW = width - pad.left - pad.right;
+      const plotH = height - pad.top - pad.bottom;
+      const lanes = uniqueSorted(base.map(e => e.event_type));
+      const laneY = type => {
+        const idx = Math.max(0, lanes.indexOf(type));
+        return pad.top + (idx + 0.5) * (plotH / Math.max(lanes.length, 1));
+      };
+      const xFor = ns => pad.left + ((ns - domain[0]) / Math.max(domain[1] - domain[0], 1)) * plotW;
+
+      ctx.clearRect(0, 0, width, height);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, width, height);
+
+      ctx.strokeStyle = "#e8ebf0";
+      ctx.lineWidth = 1;
+      for (let i = 0; i <= 6; i++) {
+        const x = pad.left + (plotW * i / 6);
+        ctx.beginPath();
+        ctx.moveTo(x, pad.top);
+        ctx.lineTo(x, height - pad.bottom);
+        ctx.stroke();
+        const tickNs = domain[0] + ((domain[1] - domain[0]) * i / 6);
+        ctx.fillStyle = "#657080";
+        ctx.font = "12px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(formatNs(tickNs), x, height - 18);
+      }
+
+      lanes.forEach(type => {
+        const y = laneY(type);
+        ctx.strokeStyle = "#edf0f4";
+        ctx.beginPath();
+        ctx.moveTo(pad.left, y);
+        ctx.lineTo(width - pad.right, y);
+        ctx.stroke();
+        ctx.fillStyle = "#657080";
+        ctx.font = "12px sans-serif";
+        ctx.textAlign = "right";
+        ctx.fillText(type, pad.left - 10, y + 4);
+      });
+
+      visible.forEach(event => {
+        const x = xFor(eventNs(event));
+        const y = laneY(event.event_type);
+        ctx.fillStyle = colorFor(event.event_type);
+        ctx.beginPath();
+        const isMiss = event.event_type === "history_keyframe_missed" ||
+          event.event_type === "history_image_missed" ||
+          event.event_type === "history_pose_missed";
+        ctx.arc(x, y, isMiss ? 6 : 5, 0, Math.PI * 2);
+        ctx.fill();
+        if (event.target_timestamp_ns && event.matched_frame_timestamp_ns) {
+          const tx = xFor(Number(event.target_timestamp_ns));
+          const mx = xFor(Number(event.matched_frame_timestamp_ns));
+          ctx.strokeStyle = colorFor(event.event_type);
+          ctx.globalAlpha = 0.45;
+          ctx.beginPath();
+          ctx.moveTo(tx, y - 10);
+          ctx.lineTo(mx, y - 10);
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+        }
+      });
+
+      renderStats(visible, domain);
+      renderTable(visible);
+    }
+
+    async function readFiles(files) {
+      const loaded = [];
+      for (const file of files) {
+        const text = await file.text();
+        text.split(/\r?\n/).forEach((line, index) => {
+          const trimmed = line.trim();
+          if (!trimmed) return;
+          try {
+            const event = JSON.parse(trimmed);
+            event._file = file.name;
+            event._line = index + 1;
+            if (eventNs(event) > 0) loaded.push(event);
+          } catch (err) {
+            console.warn(`Skipping ${file.name}:${index + 1}`, err);
+          }
+        });
+      }
+      events = loaded.sort((a, b) => eventNs(a) - eventNs(b));
+      zoom = null;
+      fileSummary.textContent = `${events.length} events loaded from ${files.length} file(s).`;
+      rebuildFilters();
+      renderChart();
+    }
+
+    function canvasXToNs(clientX) {
+      const rect = canvas.getBoundingClientRect();
+      const x = (clientX - rect.left) * (canvas.width / rect.width);
+      const padLeft = 70;
+      const padRight = 28;
+      const source = getFilteredEvents(true);
+      const domain = currentDomain(source);
+      const ratio = Math.min(1, Math.max(0, (x - padLeft) / (canvas.width - padLeft - padRight)));
+      return domain[0] + ratio * (domain[1] - domain[0]);
+    }
+
+    fileInput.addEventListener("change", () => readFiles(Array.from(fileInput.files || [])));
+    eventFilter.addEventListener("change", renderChart);
+    deviceFilter.addEventListener("change", renderChart);
+    sourceFilter.addEventListener("change", renderChart);
+    resetZoom.addEventListener("click", () => {
+      zoom = null;
+      renderChart();
+    });
+
+    canvas.addEventListener("mousedown", event => {
+      dragStartX = event.clientX;
+    });
+    window.addEventListener("mouseup", event => {
+      if (dragStartX == null) return;
+      const start = canvasXToNs(dragStartX);
+      const end = canvasXToNs(event.clientX);
+      dragStartX = null;
+      if (Math.abs(end - start) > 1e6) {
+        zoom = [Math.min(start, end), Math.max(start, end)];
+        renderChart();
+      }
+    });
+
+    renderChart();
+  </script>
+</body>
+</html>

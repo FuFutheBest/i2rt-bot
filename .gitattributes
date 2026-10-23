@@ -1,0 +1,3 @@
+/incubator/control_panel/tools/convert_accepted_episode.py text eol=lf
+/incubator/control_panel/tools/merge_lerobot_shards.py text eol=lf
+/incubator/control_panel/tools/nedf3_rollout_to_lerobot.py text eol=lf

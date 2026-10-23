@@ -1,0 +1,35 @@
+defaults:
+  - devices: i2rt_bimanual_collection
+  - device_manager: base
+  - action_executor: default
+  - consumer: default
+  - runtime: default
+  - _self_
+
+device_manager:
+  device_manager:
+    params:
+      buffer_size: 100
+
+camera:
+  # Use stable UVC device paths. The recorder generates the missing head
+  # stream as black frames.
+  left_id: 0
+  left_capture: ${oc.env:SI_I2RT_LEFT_CAMERA,/dev/v4l/by-id/usb-Camera_Vendor_USB2_openMV_Camera_00.00.01-video-index0}
+  right_id: 2
+  right_capture: ${oc.env:SI_I2RT_RIGHT_CAMERA,/dev/v4l/by-id/usb-Camera_Vendor_USB3_openMV_Camera_00.00.01-video-index0}
+
+runtime:
+  enable_device_manager: false
+
+global_settings:
+  log_level: INFO
+  # Do not restart a partially failed physical teleoperation rig automatically.
+  restart_on_failure: false
+  max_restart_attempts: 3
+  restart_delay: 2.0
+
+hydra:
+  run:
+    dir: .
+  output_subdir: null
